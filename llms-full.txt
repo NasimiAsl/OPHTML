@@ -1,4 +1,4 @@
-# OPHTML 1.1.0 — complete starter context for LLMs
+# OPHTML 1.1.1 — complete starter context for LLMs
 
 Repository: https://github.com/NasimiAsl/OPHTML
 License: MIT, copyright 2026 NasimiAsl.
@@ -116,8 +116,13 @@ be deferred with #_is/#_if, #_then, #_else, #_end, #_dy(EXPR#_).
 Item fields become $$field. $$repeaterKey is collection key; $$repeaterIndex is
 zero-based object-item index; $$repeaterItem is an original-object JS reference.
 The engine adds repeaterKey/repeaterIndex to item objects. oncreate can transform
-interpolated item HTML using content, data, index. Avoid nested repeaters; use
-separately loaded components for complex nested lists.
+interpolated item HTML using content, data, index. For nested lists, repeat a
+loader: <div><repeater params="$$groups"><div><loader page="category-list"
+params="$$repeaterItem"></loader></div></repeater></div>. The child .htm component
+can repeat its own $$entries array. This isolates template/data scopes. See
+examples/gallery/components/nested-categories.htm and category-list.htm, plus
+nested-board.htm -> board-column.htm -> board-card.htm for three levels. Avoid
+directly nested repeater tags in a single template.
 
 ## Other custom tags
 
@@ -276,6 +281,10 @@ helpers remain; strict CSP needs adaptation. No SSR, JSX, automatic data binding
 or automatic reactive rendering is provided. Preserve existing APIs/workflow.
 
 Runnable example: examples/store/index.html, main.js, components/catalog.htm.
+36-example gallery: examples/gallery/index.html, samples.js, main.js, components/.
+Each card exposes template (including dependencies), data, and handler source.
+Gallery ctx.root/data/render/notify/setTheme are example scaffolding, NOT runtime
+APIs. docs/gallery.md explains nested components and style-driven dark/light mode.
 Full docs: README.md, docs/templates.md, docs/api.md, docs/styles.md,
 docs/animations.md, docs/migration.md, docs/llm-prompt.md.
 For repo tests: npm ci; npx playwright install chromium; npm run check; npm test.

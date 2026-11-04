@@ -1,0 +1,5 @@
+<label>Sort <select data-sort>
+  <option value="asc" #if $$order === 'asc' #then selected #end>Price: low to high</option>
+  <option value="desc" #if $$order === 'desc' #then selected #end>Price: high to low</option>
+</select></label>
+<div class="mt-sm"><repeater params="$$products"><div class="demo-row"><span>$$name</span><span>$#_dy($$price.toFixed(2)#_)</span></div></repeater></div>

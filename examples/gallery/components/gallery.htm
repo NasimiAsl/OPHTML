@@ -1,0 +1,20 @@
+<repeater params="$$samples">
+  <article class="sample-card" data-sample="$$sampleId">
+    <header class="sample-heading">
+      <div class="sample-kicker"><span>$$ordinal / $$sampleCategory</span><span>↗</span></div>
+      <h2>$$sampleTitle</h2><p>$$sampleDescription</p>
+    </header>
+    <div class="sample-preview" data-preview>Loading example…</div>
+    <details class="source-panel">
+      <summary>View source</summary>
+      <div class="source-controls">
+        <button type="button" data-source-tab="template" aria-pressed="true">Template</button>
+        <button type="button" data-source-tab="data" aria-pressed="false">Data</button>
+        <button type="button" data-source-tab="behavior" aria-pressed="false">Handlers</button>
+        <button type="button" class="copy-source">Copy</button>
+      </div>
+      <pre class="source-code"><code data-code></code></pre>
+      <p class="source-help">Handlers use the gallery’s context, not a new OPHTML API. <a href="./main.js">View host code ↗</a></p>
+    </details>
+  </article>
+</repeater>

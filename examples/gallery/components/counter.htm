@@ -1,0 +1,11 @@
+<script>
+  $$_count = 0;
+  $$_increment = function (button) {
+    $$_count += 1;
+    button.parentNode.querySelector('output').textContent = $$_count;
+  };
+</script>
+/// main content
+<div class="demo-tile"><p class="muted">This count belongs to this component.</p><output class="demo-price">0</output>
+  <button type="button" class="ml-md" onclick="_dy.TsID[$$TID].increment(this)">Add one</button>
+</div>

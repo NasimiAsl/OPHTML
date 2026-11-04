@@ -1,0 +1,5 @@
+<div class="demo-grid"><repeater params="$$products">
+  <div class="demo-tile"><strong>$$name</strong><p class="muted">$#_dy($$price.toFixed(2)#_)</p>
+    #_is value $$stock > 0 #_then<span class="badge">In stock</span>#_else<span class="muted">Sold out</span>#_end
+  </div>
+</repeater></div>

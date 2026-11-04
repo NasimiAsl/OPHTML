@@ -11,7 +11,7 @@ document.querySelector('#app').innerHTML = await _dy.render('welcome', {
 });
 ```
 
-No runtime dependencies or build step. OPHTML 1.1.0 preserves the dyHTML workflow and includes the corrected dyStyle generators.
+No runtime dependencies or build step. OPHTML 1.1.1 preserves the dyHTML workflow and includes the corrected dyStyle generators.
 
 ## Try the example
 
@@ -22,6 +22,8 @@ python3 -m http.server 8000
 ```
 
 Open [the store example](http://localhost:8000/examples/store/). It demonstrates components, repeaters, conditions, styles, animations, and explicit UI updates.
+
+Or explore the [36-example gallery](http://localhost:8000/examples/gallery/): live previews with copyable source, repeaters, switchers, every condition form, component-based nested lists, dark/light mode, mouse interactions, and common UI patterns. See the [gallery guide](docs/gallery.md).
 
 ## Start in three steps
 
@@ -76,7 +78,7 @@ Serve the project over HTTP, for example with `python3 -m http.server 8000`. Ope
 Give your coding assistant this prompt and access to this repository:
 
 ```text
-Build [describe the app] using OPHTML 1.1.0.
+Build [describe the app] using OPHTML 1.1.1.
 Read llms.txt, docs/llm-prompt.md, and the linked docs first.
 Use dyHTML/ophtml.js as the only OPHTML runtime module.
 Keep await _dy.render(name, data), _dy.root, and .htm components.
@@ -139,6 +141,7 @@ if (motion) { await motion.finished; motion.cancel(); }
 | [API](docs/api.md) | Rendering, component state, requests, helpers |
 | [Styles](docs/styles.md) | Configuration, class names, responsive masks |
 | [Animations](docs/animations.md) | Effects, timing, JavaScript controls |
+| [36-example gallery](docs/gallery.md) | Popular UI patterns, nested components, themes, copyable source |
 | [LLM prompt](docs/llm-prompt.md) | Copyable generation prompts and guardrails |
 | [Migration](docs/migration.md) | Moving existing dyHTML/dyStyle code to OPHTML |
 | [Contributing](CONTRIBUTING.md) | Running checks and browser tests |

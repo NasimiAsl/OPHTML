@@ -1,0 +1,6 @@
+<div class="demo-grid"><repeater params="$$plans">
+  <section class="demo-tile"><strong>$$planName</strong><p class="demo-price mt-sm">$#_dy($$amount#_)<small>/mo</small></p>
+    #_if $$featured #_then<p class="badge">Most popular</p>#_end
+    <button type="button" data-plan="$$planName">Choose $$planName</button>
+  </section>
+</repeater></div>

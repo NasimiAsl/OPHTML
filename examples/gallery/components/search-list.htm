@@ -1,0 +1,3 @@
+<label>Search <input type="search" data-search-products placeholder="Try notebook" value="$$queryAttribute"></label>
+#if $$matches.length === 0 #then<p class="muted mt-md">No matching products.</p>#end
+<div class="mt-sm"><repeater params="$$matches"><div class="demo-row"><span>$$name</span><span>$#_dy($$price.toFixed(2)#_)</span></div></repeater></div>

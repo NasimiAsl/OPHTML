@@ -5,7 +5,7 @@ Use the first prompt with a coding agent that can read this repository or fetch 
 ## Copy this prompt
 
 ```text
-You are building an app using OPHTML 1.1.0 (Over Powered HTML).
+You are building an app using OPHTML 1.1.1 (Over Powered HTML).
 Repository: https://github.com/NasimiAsl/OPHTML
 
 Read llms.txt and docs/templates.md, docs/api.md, docs/styles.md,
@@ -74,7 +74,7 @@ preserve existing transforms with wrappers. Respect reduced-motion behavior.
 **Fix generated code:**
 
 ```text
-Compare this code against the real OPHTML 1.1.0 source and docs.
+Compare this code against the real OPHTML 1.1.1 source and docs.
 Fix invented APIs, unescaped repeater directives, wrapper replacement bugs,
 incorrect state handlers, and assumptions about nested render completion.
 Preserve the existing user workflow. Run the relevant browser tests.

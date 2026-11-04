@@ -1,0 +1,9 @@
+<div class="demo-tabs" role="tablist" aria-label="Project views">
+  <button type="button" role="tab" id="overview-$$TID" data-tab="0" aria-controls="tabpanel-$$TID" aria-selected="#dy($$active === 0#)">Overview</button>
+  <button type="button" role="tab" id="activity-$$TID" data-tab="1" aria-controls="tabpanel-$$TID" aria-selected="#dy($$active === 1#)">Activity</button>
+</div>
+<div role="tabpanel" id="tabpanel-$$TID" aria-labelledby="#dy(($$active === 0 ? 'overview-' : 'activity-') + $$TID#)">
+  <switcher params="{selected:$$active}" oncreate="item = data.selected;">
+    <p>Everything is looking good. Your project is ready.</p>$$next-case<p>Two updates today. You are all caught up.</p>
+  </switcher>
+</div>

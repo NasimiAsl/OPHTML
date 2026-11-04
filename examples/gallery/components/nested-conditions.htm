@@ -1,0 +1,9 @@
+<div class="demo-inline">
+  <label><input type="checkbox" data-flag="account" #if $$account #then checked #end> Account</label>
+  <label><input type="checkbox" data-flag="admin" #if $$admin #then checked #end> Admin</label>
+</div><br>
+#if $$account #then
+  #is value $$admin === true #then<p class="badge">Admin workspace</p>#else<p class="badge">Member workspace</p>#end
+#else
+  <p class="muted">Create an account to continue.</p>
+#end

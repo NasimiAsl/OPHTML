@@ -1,0 +1,7 @@
+<p class="muted">Notebook · $18 each</p>
+<label>Quantity <select data-quantity>
+  <option value="1" #if $$quantity === 1 #then selected #end>1</option>
+  <option value="2" #if $$quantity === 2 #then selected #end>2</option>
+  <option value="3" #if $$quantity === 3 #then selected #end>3</option>
+</select></label><br>
+<p class="demo-price">$#dy(($$price * $$quantity).toFixed(2)#)</p>

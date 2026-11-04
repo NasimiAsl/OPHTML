@@ -1,0 +1,6 @@
+#if $$signedIn #then
+  <div class="demo-tile"><strong>Welcome back, Ada.</strong><p class="muted">Your workspace is ready.</p></div>
+#else
+  <div class="demo-tile"><strong>Hello, visitor.</strong><p class="muted">Sign in to enter your workspace.</p></div>
+#end
+<br><button type="button" data-toggle>#if $$signedIn #then Sign out #else Sign in #end</button>

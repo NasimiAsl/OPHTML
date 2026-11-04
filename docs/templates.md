@@ -105,7 +105,7 @@ The hook replaces the parent's entire contents with the list. Keep headings and 
 
 Items expose `$$repeaterKey` (collection key), `$$repeaterIndex` (zero-based object-item index), and `$$repeaterItem` (JavaScript reference to the original object). The engine adds `repeaterKey`/`repeaterIndex` to each item. An `oncreate` attribute can transform interpolated item HTML using `content`, `data`, and `index`.
 
-Avoid reusing outer parameter names as item fields: outer substitution happens first. Nested repeaters are not a documented supported pattern in this version; use separately loaded components for complex nested lists.
+Avoid reusing outer parameter names as item fields: outer substitution happens first. For nested lists, repeat a loader and pass `params="$$repeaterItem"` to a child component containing its own repeater. See the [tested component-based nesting examples](gallery.md#repeating-inside-a-repeated-component). Directly nested repeater tags within a single template remain outside the documented pattern.
 
 ## Custom tags
 

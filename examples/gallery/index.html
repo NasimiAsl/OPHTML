@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="36 runnable OPHTML examples: repeaters, switchers, conditions, nested components, themes, and animations.">
+  <title>OPHTML — The example collection</title>
+  <link rel="stylesheet" href="./gallery.css">
+</head>
+<body>
+  <a class="skip-link" href="#collection">Skip to examples</a>
+  <header class="topbar">
+    <a class="wordmark" href="../../README.md" aria-label="OPHTML README">OP<span>HTML</span><span class="version">1.1</span></a>
+    <nav aria-label="Resources">
+      <a href="../../docs/templates.md">Documentation ↗</a>
+      <a href="../../docs/llm-prompt.md">LLM prompt ↗</a>
+      <button type="button" id="theme-toggle" aria-label="Switch to dark mode">◐ <span>Dark mode</span></button>
+    </nav>
+  </header>
+  <main>
+    <section class="intro">
+      <p class="eyebrow"><span class="status-dot"></span> THE OPHTML FIELD GUIDE</p>
+      <h1>Small examples.<br><span>Real possibilities.</span></h1>
+      <div class="intro-bottom">
+        <p>36 patterns you can run, inspect, and make your own.<br>Plain HTML components. A little JavaScript. All OPHTML.</p>
+        <a class="text-link" href="#collection">Explore the collection <span>↓</span></a>
+      </div>
+      <div class="intro-code"><span class="code-dot"></span><code>await _dy.render('something-good', { ...yourIdea });</code></div>
+    </section>
+    <section id="collection" aria-label="Example collection">
+      <div class="collection-tools">
+        <div class="filters" role="group" aria-label="Filter examples">
+          <button type="button" data-category="All" aria-pressed="true">All patterns <span>36</span></button>
+          <button type="button" data-category="Data" aria-pressed="false">Data & lists</button>
+          <button type="button" data-category="Logic" aria-pressed="false">Logic</button>
+          <button type="button" data-category="Components" aria-pressed="false">Components</button>
+          <button type="button" data-category="Interface" aria-pressed="false">Interface</button>
+          <button type="button" data-category="Style" aria-pressed="false">Style & motion</button>
+        </div>
+        <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find a pattern…" aria-label="Search examples"></label>
+      </div>
+      <div class="collection-caption"><p id="result-count" role="status">Loading 36 examples…</p><span>LIVE PREVIEW + SOURCE</span></div>
+      <div id="gallery" class="gallery-grid" aria-busy="true"></div>
+      <p id="no-results" hidden>No matching examples. Try “repeater”, “form”, or “mouse”.</p>
+    </section>
+    <footer><span>Built with OPHTML. No build step.</span><a href="../../docs/gallery.md">How the examples work ↗</a></footer>
+  </main>
+  <div id="notice" class="global-notice" role="status" hidden></div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

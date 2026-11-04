@@ -1,0 +1,5 @@
+<p class="badge">Step #dy($$step + 1#) of 3</p>
+<div><switcher params="{selected:$$step}" oncreate="item = data.selected;">
+  <p>First, tell us about your idea.</p>$$next-case<p>Next, choose the details.</p>$$next-case<p>All set. Ready to make it happen.</p>
+</switcher></div>
+<div class="demo-inline"><button type="button" data-step="-1" #if $$step === 0 #then disabled #end>Back</button><button type="button" data-step="1" #if $$step === 2 #then disabled #end>Next</button></div>

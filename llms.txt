@@ -1,6 +1,6 @@
 # OPHTML
 
-> Over Powered HTML 1.1.0: a browser-only ES module for .htm components, templates, configurable CSS utilities, and animations. No build step or runtime dependencies.
+> Over Powered HTML 1.1.1: a browser-only ES module for .htm components, templates, configurable CSS utilities, and animations. No build step or runtime dependencies.
 
 Canonical runtime: dyHTML/ophtml.js. Default export: { html, script, style }.
 Start with `import OPHTML from './dyHTML/ophtml.js'; const _dy = OPHTML.html;`.
@@ -15,6 +15,7 @@ Do not infer APIs from the project name. There is no reactive binding system.
 - [API](docs/api.md): rendering, state, callbacks, return types.
 - [Styles](docs/styles.md): tokens, class names, responsive masks.
 - [Animations](docs/animations.md): automatic CSS effects and native Animation controls.
+- [36-example gallery](docs/gallery.md): runnable UI patterns, component-based nested lists, themes, and mouse interactions; entry at examples/gallery/index.html.
 - [Full context](llms-full.txt): self-contained context to paste into a model.
 - [Runnable example](examples/store/index.html): store with .htm component and event delegation.
 - [Agent instructions](AGENTS.md): repository-editing rules.

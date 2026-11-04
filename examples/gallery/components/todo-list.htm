@@ -1,0 +1,5 @@
+<div><repeater params="$$tasks">
+  <label class="demo-row"><input type="checkbox" data-task="$$id" #_if $$done #_then checked #_end>
+    <span>$$label</span><span class="muted">#_if $$done #_then Done #_else To do #_end</span>
+  </label>
+</repeater></div>

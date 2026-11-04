@@ -1,0 +1,5 @@
+<div><repeater params="$$rows"><div class="demo-row"><span>$$name</span><span class="muted">$$role</span></div></repeater></div>
+<div class="demo-inline demo-pages mt-md" aria-label="Pagination">
+  <button type="button" data-page="1" #if $$page === 1 #then aria-current="page" #end>1</button>
+  <button type="button" data-page="2" #if $$page === 2 #then aria-current="page" #end>2</button>
+</div>

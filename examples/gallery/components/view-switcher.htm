@@ -1,0 +1,12 @@
+<label class="demo-inline">View <select data-view>
+  <option value="0" #if $$view === 0 #then selected #end>Overview</option>
+  <option value="1" #if $$view === 1 #then selected #end>Details</option>
+  <option value="2" #if $$view === 2 #then selected #end>Activity</option>
+</select></label><br>
+<div><switcher params="{selected:$$view}" oncreate="item = data.selected;">
+  <div class="demo-tile"><strong>Overview</strong><p class="muted">Your project at a glance.</p></div>
+  $$next-case
+  <div class="demo-tile"><strong>Details</strong><p class="muted">Everything worth knowing.</p></div>
+  $$next-case
+  <div class="demo-tile"><strong>Activity</strong><p class="muted">The latest project updates.</p></div>
+</switcher></div>

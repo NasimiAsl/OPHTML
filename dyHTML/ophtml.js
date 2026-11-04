@@ -1,5 +1,5 @@
 /**
- * ophtml 1.1.0 — successor to dyHTML v2.0.01.
+ * ophtml 1.1.1 — successor to dyHTML v2.0.01.
  *
  * Replace the old module import with:
  *   import engine from './ophtml.js';
@@ -597,6 +597,7 @@ dy.prototype = {
       .replaceAll("</iloader>", ` </tmp></div>`)
       .replaceAll("</com>", ` </tmp></div>`)
       .replaceAll("</repeater>", `</textarea>`)
+      .replaceAll("</switcher>", `</textarea>`)
       .replaceAll("</dy>", `</textarea></div>`)
       .replaceAll("</dyc>", `</tmp>`)
       .replaceAll("</dy-style>", `</textarea></div>`)
@@ -1626,7 +1627,7 @@ function easyAnimationCss() {
 }
 
 const opStyle = {
-  version: '1.1.0',
+  version: '1.1.1',
   init(value = '') {
     const element = document.createElement('style');
     element.textContent = String(value);

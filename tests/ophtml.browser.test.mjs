@@ -62,11 +62,11 @@ before(async () => {
       res.end(readmeHtml.find(html => html.startsWith('<!doctype html>')));
     } else if (path === '/docs-quickstart/components/welcome.htm') {
       res.end(readmeHtml[0]);
-    } else if (path.startsWith('/examples/store/')) {
+    } else if (path.startsWith('/examples/store/') || path.startsWith('/examples/gallery/')) {
       try {
         const file = path.endsWith('/') ? path + 'index.html' : path;
         const body = await readFile(new URL('..' + file, import.meta.url));
-        res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'text/html');
+        res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
         res.end(body);
       } catch { res.writeHead(404); res.end('missing'); }
     } else if (path === '/') {
@@ -592,6 +592,147 @@ test('store example loads real files, filters products, updates basket and repla
   await page.locator('#filter').click();
   await page.waitForFunction(() => document.querySelectorAll('#app article').length === 3);
   await page.setViewportSize({ width: 375, height: 800 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  assert.deepEqual(errors, []);
+});
+
+async function openGallery() {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(origin + '/examples/gallery/');
+  await page.waitForFunction(() => document.querySelector('#gallery')?.dataset.ready === 'true');
+  await page.waitForFunction(() => document.querySelectorAll('[data-board-tag]').length === 4);
+  return errors;
+}
+const gallerySample = id => page.locator(`[data-sample="${id}"] [data-preview]`);
+
+test('gallery loads 36 genuine examples and nested components without unresolved parameters', async () => {
+  const errors = await openGallery();
+  assert.equal(await page.locator('[data-sample]').count(), 36);
+  assert.equal(await page.locator('[data-sample][data-ready="true"]').count(), 36);
+  assert.equal(await page.locator('.sample-error').count(), 0);
+  const desktopBoxes = await page.locator('[data-sample]').evaluateAll(cards => cards.slice(0, 3).map(card => {
+    const rect = card.getBoundingClientRect(); return { x: rect.x, y: rect.y };
+  }));
+  assert.ok(desktopBoxes[0].x < desktopBoxes[1].x && desktopBoxes[1].x < desktopBoxes[2].x);
+  assert.ok(desktopBoxes.every(box => Math.abs(box.y - desktopBoxes[0].y) < 1));
+  assert.equal(await gallerySample('data-table').locator('tbody tr').count(), 3);
+  assert.equal(await gallerySample('basic-repeat').locator('.demo-row').count(), 3);
+  assert.equal(await gallerySample('nested-categories').locator('[data-category-group]').count(), 2);
+  assert.equal(await gallerySample('nested-categories').locator('[data-nested-item]').count(), 3);
+  assert.equal(await gallerySample('nested-team').locator('[data-member]').count(), 3);
+  assert.equal(await gallerySample('nested-board').locator('[data-board-column]').count(), 2);
+  assert.equal(await gallerySample('nested-board').locator('[data-board-card]').count(), 3);
+  const text = await page.locator('#gallery').evaluate(root => [...root.querySelectorAll('[data-preview]')].map(node => node.innerText).join('\n'));
+  assert.doesNotMatch(text, /\$\$|#_?(?:is|then|else|end|dy)\b|\[object Object\]/);
+  await gallerySample('nested-categories').getByRole('button').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-sample="nested-categories"] [data-nested-item]').length === 4);
+  assert.deepEqual(errors, []);
+});
+test('gallery switchers and all condition forms respond to data changes', async () => {
+  const errors = await openGallery();
+  await gallerySample('view-switcher').locator('select').selectOption('2');
+  await page.waitForFunction(() => document.querySelector('[data-sample="view-switcher"] [data-preview]').innerText.includes('The latest project updates.'));
+  await gallerySample('if-session').getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForFunction(() => document.querySelector('[data-sample="if-session"] [data-preview]').innerText.includes('Welcome back'));
+  await gallerySample('is-stock').getByRole('button').click();
+  assert.match(await gallerySample('is-stock').innerText(), /Temporarily out of stock/);
+  await gallerySample('is-defined').getByRole('button').click();
+  assert.match(await gallerySample('is-defined').innerText(), /No subtitle/);
+  await gallerySample('is-missing').getByRole('button').click();
+  assert.match(await gallerySample('is-missing').innerText(), /Nice to see you, Ada/);
+  await gallerySample('nested-conditions').locator('[data-flag="admin"]').check();
+  assert.match(await gallerySample('nested-conditions').innerText(), /Admin workspace/);
+  await gallerySample('expression-total').locator('select').selectOption('3');
+  assert.match(await gallerySample('expression-total').innerText(), /\$54\.00/);
+  await gallerySample('async-states').locator('select').selectOption('2');
+  await page.waitForFunction(() => document.querySelector('[data-sample="async-states"] [data-preview]').innerText.includes('could not load'));
+  assert.deepEqual(errors, []);
+});
+test('gallery controls support todos, pagination, search, sorting and component state', async () => {
+  const errors = await openGallery();
+  await gallerySample('todo-list').locator('[data-task="2"]').check();
+  assert.equal(await gallerySample('todo-list').locator('input:checked').count(), 2);
+  await gallerySample('pagination').locator('[data-page="2"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-sample="pagination"] [data-preview]').innerText.includes('Noor Ali'));
+  await gallerySample('search-list').locator('input').fill('notebook');
+  await page.waitForFunction(() => document.querySelectorAll('[data-sample="search-list"] .demo-row').length === 1);
+  await gallerySample('search-list').locator('input').fill('"<unmatched>');
+  await page.waitForFunction(() => document.querySelector('[data-sample="search-list"] [data-preview]').innerText.includes('No matching products'));
+  assert.equal(await gallerySample('search-list').locator('input').inputValue(), '"<unmatched>');
+  await gallerySample('sort-list').locator('select').selectOption('desc');
+  assert.match(await gallerySample('sort-list').locator('.demo-row').first().innerText(), /Desk light/);
+  await gallerySample('counter').getByRole('button').click();
+  await gallerySample('counter').getByRole('button').click();
+  assert.equal(await gallerySample('counter').locator('output').innerText(), '2');
+  assert.deepEqual(errors, []);
+});
+test('gallery interface samples work with mouse and keyboard', async () => {
+  const errors = await openGallery();
+  await gallerySample('faq').locator('summary').first().click();
+  assert.equal(await gallerySample('faq').locator('details').first().evaluate(element => element.open), true);
+  await gallerySample('tabs').locator('[data-tab="0"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('[data-sample="tabs"] [role="tab"][aria-selected="true"]').dataset.tab === '1');
+  await gallerySample('dropdown').locator('summary').click();
+  await gallerySample('dropdown').getByRole('button', { name: 'Settings' }).click();
+  assert.match(await gallerySample('dropdown').innerText(), /Settings selected/);
+  await gallerySample('modal').getByRole('button', { name: 'Open dialog' }).click();
+  assert.equal(await gallerySample('modal').locator('dialog').evaluate(element => element.open), true);
+  await page.keyboard.press('Escape');
+  assert.equal(await gallerySample('modal').locator('dialog').evaluate(element => element.open), false);
+  await gallerySample('toast').getByRole('button').click();
+  assert.equal(await gallerySample('toast').locator('[data-toast-message]').isVisible(), true);
+  await gallerySample('form').locator('input').fill('ada@example.com');
+  await gallerySample('form').getByRole('button').click();
+  assert.match(await gallerySample('form').innerText(), /Demo signup for ada@example.com/);
+  await gallerySample('stepper').getByRole('button', { name: 'Next' }).click();
+  await gallerySample('stepper').getByRole('button', { name: 'Next' }).click();
+  assert.match(await gallerySample('stepper').innerText(), /Step 3 of 3/);
+  assert.deepEqual(errors, []);
+});
+test('gallery theme persists and style tokens drive hover and pointer interactions', async () => {
+  const errors = await openGallery();
+  await gallerySample('theme').getByRole('button', { name: 'Dark', exact: true }).click();
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+  const darkBackground = await page.locator('body').evaluate(element => getComputedStyle(element).backgroundColor);
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector('#gallery')?.dataset.ready === 'true');
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+  await page.locator('#theme-toggle').click();
+  const lightBackground = await page.locator('body').evaluate(element => getComputedStyle(element).backgroundColor);
+  assert.notEqual(lightBackground, darkBackground);
+  const hover = gallerySample('mouse').getByRole('button');
+  await hover.hover();
+  await page.waitForTimeout(200);
+  assert.equal(await hover.evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(40, 118, 90)');
+  const pad = gallerySample('mouse').locator('[data-pointer]');
+  await pad.hover({ position: { x: 20, y: 30 } });
+  const coordinates = (await pad.locator('output').innerText()).split(',').map(Number);
+  assert.ok(Math.abs(coordinates[0] - 20) <= 1 && Math.abs(coordinates[1] - 30) <= 1);
+  await gallerySample('motion').getByRole('button', { name: 'Pulse' }).click();
+  assert.deepEqual(errors, []);
+});
+test('gallery search, category filters and source inspection are usable on mobile', async () => {
+  const errors = await openGallery();
+  await page.locator('[data-category="Components"]').click();
+  assert.equal(await page.locator('[data-sample]:visible').count(), 5);
+  await page.locator('#search').fill('three levels');
+  assert.equal(await page.locator('[data-sample]:visible').count(), 1);
+  const card = page.locator('[data-sample="nested-board"]');
+  await card.locator('.source-panel summary').click();
+  assert.match(await card.locator('[data-code]').innerText(), /components\/board-card.htm/);
+  await card.locator('[data-source-tab="data"]').click();
+  assert.match(await card.locator('[data-code]').innerText(), /"columns"/);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await card.locator('.copy-source').click();
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await card.locator('[data-code]').innerText());
+  await page.locator('#search').fill('no-such-pattern');
+  assert.equal(await page.locator('#no-results').isVisible(), true);
+  await page.locator('#search').fill('');
+  await page.locator('[data-category="All"]').click();
+  await page.setViewportSize({ width: 375, height: 800 });
+  assert.equal(await page.locator('[data-sample]:visible').count(), 36);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);
 });

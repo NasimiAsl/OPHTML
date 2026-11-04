@@ -14,6 +14,8 @@ The two original modules are reference files. Do not load old `dystyle.js` after
 
 ## Corrected behavior to check
 
+OPHTML 1.1.1 adds the example gallery and fixes switcher closing-tag conversion, so content following a switcher remains outside its case template.
+
 - Conditions handle false branches/nesting; `#if` aliases expression conditions. Invalid directives now throw instead of silently producing damaged HTML.
 - Header parameters precede conditions. Async main initialization is awaited and runs once per component identity.
 - Failed template requests reject instead of leaving rendering pending.

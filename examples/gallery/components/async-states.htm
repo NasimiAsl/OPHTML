@@ -1,0 +1,6 @@
+<label>State <select data-state>
+  <option value="0" #if $$state === 0 #then selected #end>Loading</option><option value="1" #if $$state === 1 #then selected #end>Empty</option><option value="2" #if $$state === 2 #then selected #end>Error</option>
+</select></label><br>
+<div><switcher params="{selected:$$state}" oncreate="item = data.selected;">
+  <p role="status"><span class="op-spin" style="display:inline-block">◌</span> Loading your items…</p>$$next-case<p>No items yet. A fresh start.</p>$$next-case<p>We could not load this. Please try again.</p>
+</switcher></div>
