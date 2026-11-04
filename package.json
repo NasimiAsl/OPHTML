@@ -1,0 +1,17 @@
+{
+  "name": "ophtml",
+  "version": "1.1.0",
+  "description": "Over Powered HTML: browser components, templates, styles, and animations in one module",
+  "private": true,
+  "type": "module",
+  "main": "./dyHTML/ophtml.js",
+  "exports": "./dyHTML/ophtml.js",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/NasimiAsl/OPHTML.git" },
+  "scripts": {
+    "test": "node --test --test-timeout=60000 tests/*.test.mjs",
+    "check": "node --check dyHTML/ophtml.js && node --check examples/store/main.js"
+  },
+  "devDependencies": { "playwright": "1.57.0" },
+  "engines": { "node": ">=22" }
+}

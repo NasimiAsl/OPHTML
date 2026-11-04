@@ -1,0 +1,33 @@
+# OPHTML
+
+> Over Powered HTML 1.1.0: a browser-only ES module for .htm components, templates, configurable CSS utilities, and animations. No build step or runtime dependencies.
+
+Canonical runtime: dyHTML/ophtml.js. Default export: { html, script, style }.
+Start with `import OPHTML from './dyHTML/ophtml.js'; const _dy = OPHTML.html;`.
+Set `_dy.root = '/components/';`, then `await _dy.render('name', params)` and insert HTML.
+Do not infer APIs from the project name. There is no reactive binding system.
+
+## Documentation
+
+- [Quick start](README.md): runnable setup and minimal example.
+- [LLM prompt](docs/llm-prompt.md): copyable app-generation prompt and constraints.
+- [Templates](docs/templates.md): directives, repeaters, script sections, lifecycle.
+- [API](docs/api.md): rendering, state, callbacks, return types.
+- [Styles](docs/styles.md): tokens, class names, responsive masks.
+- [Animations](docs/animations.md): automatic CSS effects and native Animation controls.
+- [Full context](llms-full.txt): self-contained context to paste into a model.
+- [Runnable example](examples/store/index.html): store with .htm component and event delegation.
+- [Agent instructions](AGENTS.md): repository-editing rules.
+
+## Essential constraints
+
+- Use `.htm`, `$$name`, and documented # directives, not JSX/mustache syntax.
+- Repeat object arrays in `<repeater params="$$items">`, in a dedicated wrapper.
+- Per-item condition/expression forms: `#_is ... #_then ... #_else ... #_end`, `#_dy(EXPR#_)`.
+- `_dy.style.use(config)` installs utilities. `_dyStyle` is a compatibility alias.
+- `op-fade-in`, `op-slide-up`, `op-spin` CSS works after import.
+- `_dy.animate(selector, 'fadeIn', options)` returns Animation/null; await `.finished`.
+- No automatic UI updates. Render again or modify DOM explicitly.
+- render awaits its own initialization, not image-load hooks or nested requests after insertion.
+- Templates execute trusted JS and interpolate raw HTML. Escape/sanitize untrusted data.
+- Serve over HTTP; preserve the legacy eval/inline-hook environment when setting CSP.

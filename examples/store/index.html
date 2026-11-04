@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OPHTML store example</title>
+  <style>
+    body { margin: 0; background: #f3f5fa; color: #192338; }
+    main { max-width: 1080px; margin: 0 auto; padding: 32px 20px; }
+    button { font: inherit; cursor: pointer; border: 0; }
+    button:focus-visible, a:focus-visible { outline: 3px solid #4b6fff; outline-offset: 3px; }
+    button:disabled { cursor: default; }
+    .product-card { flex: 1 1 240px; box-sizing: border-box; }
+    .product-emoji { display: block; font-size: 48px; margin-bottom: 16px; }
+    .product-card h2 { margin: 0 0 8px; }
+    .product-card p { line-height: 1.5; }
+    .toolbar { margin: 24px 0; }
+    #status { min-height: 24px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p>OPHTML 1.1.0 · runnable example</p>
+      <h1>Small things, well made.</h1>
+      <p>One module. HTML components, styles, and a little motion.</p>
+    </header>
+    <div class="toolbar f f-w f-ac gap-md">
+      <button id="filter" type="button" class="_p-sm rad-sm cwhite c-tmain" aria-pressed="false">
+        Show in-stock only
+      </button>
+      <button id="replay" type="button" class="_p-sm rad-sm cwhite c-tmain">Replay animation</button>
+      <span id="basket" aria-live="polite">Basket: 0</span>
+    </div>
+    <div id="app" aria-busy="true">Loading products…</div>
+    <p id="status" role="status"></p>
+    <footer>
+      <p>Read the <a href="../../README.md">README</a> and <a href="../../docs/llm-prompt.md">LLM prompt</a>.</p>
+    </footer>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

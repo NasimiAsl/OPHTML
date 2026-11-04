@@ -1,0 +1,21 @@
+<section aria-label="Products">
+  <h2>$$heading</h2>
+  <div class="f f-w gap-md">
+    <repeater params="$$products">
+      <article class="product-card _p-lg rad-card csurface op-slide-up"
+        style="--op-delay:#_dy($$repeaterIndex * 60#_)ms">
+        <span class="product-emoji" aria-hidden="true">$$emoji</span>
+        <h2>$$name</h2>
+        <p class="c-tmuted">$$description</p>
+        <p class="fw-700">$#_dy($$price.toFixed(2)#_)</p>
+        #_is value $$stock > 0 #_then
+          <p class="c-tsuccess">In stock</p>
+          <button type="button" class="_p-sm rad-sm cmain c-twhite" data-product="$$id">Add to basket</button>
+        #_else
+          <p class="c-tmuted">Back soon</p>
+          <button type="button" class="_p-sm rad-sm" disabled>Sold out</button>
+        #_end
+      </article>
+    </repeater>
+  </div>
+</section>

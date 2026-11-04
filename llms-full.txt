@@ -1,0 +1,287 @@
+# OPHTML 1.1.0 — complete starter context for LLMs
+
+Repository: https://github.com/NasimiAsl/OPHTML
+License: MIT, copyright 2026 NasimiAsl.
+OPHTML means Over Powered HTML. It is a browser-only ES module with no runtime
+package dependencies or build step. It combines HTML component rendering,
+dyHTML-compatible templates, configurable style utilities, and animation CSS.
+This document is framework context, not the user's app specification. Follow
+it with the actual app request. Do not invent APIs that are absent below.
+
+## Files and setup
+
+Current runtime: dyHTML/ophtml.js (self-contained, including styles).
+Legacy references: dyHTML/dyhtmlv2.0.01.js and dyHTML/dystyle.js; do not load them
+in a new OPHTML app. Preserve existing application files when integrating.
+Use modern browsers supporting ES modules, CSS media range queries, and Web
+Animations. Serve over HTTP, e.g. python3 -m http.server 8000, not file://.
+
+import OPHTML, { style } from './dyHTML/ophtml.js';
+const _dy = OPHTML.html;
+_dy.root = '/components/';
+_dy.style.use({ colors: { brand: '#1462ab' } });
+try {
+  document.querySelector('#app').innerHTML = await _dy.render('welcome', {
+    heading: 'Welcome', available: true
+  });
+} catch (error) {
+  document.querySelector('#app').textContent = error.message;
+}
+
+Default export: { html, script, style }. Globals: _dy, _dyScript, _dyStyle,
+_ophtml, _ophtmlScript, _ophtmlStyle. _dy.style === OPHTML.style === style.
+Named ophtml is a legacy constructor alias of dy, not the default object.
+
+## Paths and rendering
+
+_dy.root = '/components/'; render('welcome') loads /components/welcome.htm.
+render('shop.card') loads /components/shop/card.htm. Leading slashes in names
+are stripped. Names may include .htm. A root without trailing slash works.
+The default root is /dyhtml/components/ (lowercase). Set it explicitly.
+_dy.root overrides per-loader path / loadPage root arguments.
+_dy.basePath is separate: it controls the legacy $$root template placeholder.
+
+- await _dy.render(page, params?, showData?) -> HTML string.
+  Third argument true -> { html, data }; data.TID identifies component state.
+  Parameters are shallow-copied; nested values remain references.
+- await _dy.renderElement(element, page, params?, css?) -> generated div wrapper.
+  Creates a controller, replaces target contents after successful render.
+- await _dy.loadPage(page, controller?, callback?, root?, params?, after?)
+  -> { html, data }. callback(controller, html, params) owns insertion if given;
+  otherwise controller.innerHTML is assigned. after(params) follows background.
+- await _dy.renderTemplate(template, data?, showData?) -> string or {html,data}.
+  Ordinary text placeholders are filled from data, but initial conditions see
+  wrapper parameters {data,TID}; use $$data.enabled in conditions here.
+  Prefer file-based render for reusable/custom-tag-heavy components.
+
+Templates are cached by resolved URL. params.noCache=true or 'true' refetches.
+Request/template/init errors reject the render promise; use try/catch.
+Await render waits for loading, header, async initialization, HTML callback,
+and synchronous background code. It does NOT await custom-tag image-load hooks
+or nested requests after insertion. Wait for their DOM to inspect readiness.
+
+## Basic template syntax
+
+Text placeholders: $$heading, $$price. Objects/arrays become internal JavaScript
+references where needed (e.g. params="$$items"). Unknown placeholders remain.
+Use distinct outer/item names: outer substitution runs before per-item work.
+There is no universal nested-property text interpolation; flatten display
+values or use #dy expressions. $$TID is the numeric component identity.
+$$hide -> hdn-i; $$images -> /images; $$date -> timestamp.
+
+#is value $$price > 100 #then
+  <span>Premium</span>
+#else
+  <span>Standard</span>
+#end
+
+#if $$available #then <button>Buy</button> #end
+#is define title <h1>$$title</h1> #else <h1>Untitled</h1> #end
+#is not define description <p>No description</p> #end
+<span>Total: #dy($$price * $$quantity#)</span>
+
+#if aliases #is value. #then is required for expressions and optional for
+define forms. #else is optional. Conditions nest; close every one with #end.
+#is define checks legacy truthiness: null/undefined/false/empty/loosely zero
+fail. #is not define checks only undefined (null is considered defined).
+Expressions accept $$parameter, $$$item (current parameters/item), and trusted
+JavaScript. Quoted legacy placeholders also work: "$$status" === "active".
+Invalid expressions/unbalanced directives throw. Expressions are not sandboxed.
+
+## Repeaters
+
+Caller data: { heading:'Tasks', tasks:[{label:'Read',done:true}] }.
+Component:
+
+<h1>$$heading</h1>
+<div class="f f-c gap-md">
+  <repeater params="$$tasks">
+    <article class="_p-md rad-md op-slide-up">
+      <span>$$label</span>
+      #_is value $$done #_then
+        <span>Completed</span>
+      #_else
+        <span>Pending</span>
+      #_end
+      <span>Row #_dy($$repeaterIndex + 1#_)</span>
+      <button onclick="console.log($$repeaterItem)">Inspect</button>
+    </article>
+  </repeater>
+</div>
+
+Use arrays of objects. Null/primitive entries are skipped, empty arrays render
+empty. The hook replaces ALL content of its parent wrapper. Keep headings and
+unrelated siblings outside that wrapper. Conditions/expressions for items MUST
+be deferred with #_is/#_if, #_then, #_else, #_end, #_dy(EXPR#_).
+Item fields become $$field. $$repeaterKey is collection key; $$repeaterIndex is
+zero-based object-item index; $$repeaterItem is an original-object JS reference.
+The engine adds repeaterKey/repeaterIndex to item objects. oncreate can transform
+interpolated item HTML using content, data, index. Avoid nested repeaters; use
+separately loaded components for complex nested lists.
+
+## Other custom tags
+
+Use lowercase paired tags; these compile as strings, not Web Components.
+Give consuming loader/repeater/switcher/content tags a dedicated wrapper.
+
+<div><loader page="card" params="{name:'Ada'}"></loader></div>
+<iloader page="card" params="{name:'Ada'}"></iloader>
+<com "card" params="{name:'Ada'}"></com>
+<div><content params="{name:'Ada'}">$$name</content></div>
+<icontent params="{name:'Ada'}">$$name</icontent>
+<dy "{name:'Ada'}">$$name</dy>
+<div><dyc "{name:'Ada'}">$$name</dyc></div>
+
+params is a trusted JavaScript expression, not necessarily JSON. Loader fields
+include page, path, params, def, css, onready, online. def="false" removes parent.
+
+<div>
+  <switcher params="{loggedIn:true}" oncreate="item = data.loggedIn ? 1 : 0;">
+    <p>Sign in</p>$$next-case<p>Welcome</p>
+  </switcher>
+</div>
+
+Cases start at 0; default is 0; invalid case throws. No invented switch API.
+
+## State, scripts and interaction
+
+Use normal DOM events/delegation from your app JS for simple interactions.
+There is no reactive state/binding system: update DOM or explicitly render again.
+Initialization section in a .htm file:
+
+<script>
+  $$_clicks = 0;
+  $$_increment = function(button) {
+    $$_clicks += 1;
+    button.textContent = 'Clicks: ' + $$_clicks;
+  };
+</script>
+/// main content
+<button onclick="_dy.TsID[$$TID].increment(this)">Clicks: 0</button>
+
+In scripts $$_name maps to _dy.TsID[TID].name; $$$item maps to state. Initialization
+may await and runs once per identity. Its data argument is state; state.ref is
+render params. Every render creates a fresh identity. Plain inline markup does
+not universally expand $$_; use explicit _dy.TsID[$$TID] references as shown.
+
+Other script sections:
+- /// header: preceding JS runs asynchronously with a fresh item object; its
+  assigned properties merge into template params before condition evaluation.
+  Header item is not the data argument from render.
+- /// background script: following JS runs after the HTML callback through eval.
+  $$_ctrl exists when a controller is supplied; plain render has none. No
+  top-level await here; internally started promises are not awaited.
+
+_dy.getDyElement(selectorOrElement) reads state only for an element with .iden,
+not arbitrary descendants. State/ref collections have no public disposal API.
+
+## Styling
+
+_dy.style.use({
+  colors: { brand:'#1462ab', surface:'#f5f7fb' },
+  sizes: { card:'320px', space:'20px' },
+  textSizes:{title:'28px'}, borders:{thin:'0.5px'}, radius:{card:'12px'},
+  layers:{menu:50}, opacity:{muted:.6}, breakPoints:[420,720,1010]
+});
+
+use(options,id='ophtml-theme') merges objects with defaults and replaces that
+style element; later calls start from defaults, not previous custom options.
+init(css) appends a style element. live(id,css) updates/creates one. build(options)
+returns utility CSS. Individual generators return strings without defaults:
+size/fontSize/border/color/radius/layer/opacity/shadow/responsive(options), and
+flex/nasted/nested/overflow/hidden/icon/animation(). nested aliases nasted.
+_dyStyle is the integrated compatibility alias; do not import old dystyle.js.
+
+Default sizes: 0=0px,xs=4px,sm=8px,md=16px,lg=24px,xl=32px,full=100%,auto=auto.
+Default colors: main=#1462ab,white=#fff,black=#000,transparent=transparent.
+Default text sizes: sm=12px,md=16px,lg=24px,xl=32px.
+Default radius: 0=0px,sm=4px,md=8px,lg=16px,full=9999px.
+Default borders: 0=0px,1=1px,2=2px. Default opacity: 0=0,05=.5,1=1.
+
+For sizes token space:
+_w-space/_h-space dimensions; _w-mn-space/_w-mx-space min/max width;
+_h-mn-space/_h-mx-space min/max height; _w-ex-space/_h-ex-space exact dimension;
+_p-space,_pl-space,_pr-space,_pt-space,_pb-space,_plr-space,_ptb-space padding;
+m-space,ml-space,mr-space,mt-space,mb-space,mlr-space,mtb-space margins;
+l-space,r-space,t-space,b-space position; l-nspace etc negative position;
+gap-space,gap-x-space,gap-y-space gaps. Insert -i before token for important:
+_w-i-space, _w-mx-i-space, _ptb-i-space, mtb-i-space. Numeric lengths become px.
+asp-2x3 gives aspect-ratio:2/3 (all 1..4 combinations).
+
+Flex: f/fl display; f-r/f-c/f-rr/f-cr direction; f-w/f-nw/f-wr wrap;
+f-js/f-jc/f-je/f-ja/f-jb justify; f-as/f-ac/f-ae/f-at/f-al align items.
+For brand color: cbrand background, c-tbrand text, c-bbrand border;
+c-ibrand,c-t-ibrand,c-b-ibrand important. Hover: c-hbrand,c-t-hbrand,c-b-hbrand;
+focus uses -f; important states use e.g. c-i-hbrand, c-t-i-fbrand.
+fs-title/fs-i-title font size; fw-100/300/500/700/900; ta-left/center/right.
+ba-thin/bt-thin/bb-thin/bl-thin/br-thin borders; b-solid/b-dash/b-dot/b-none.
+rad-card and rad-r/l/t/b-card corners; ly-menu z-index; op-muted opacity.
+full/relative/absolute/fixed positioning; owf/owf-x/owf-y overflow.
+hdn/hdn-i hidden; disabled class disables pointer events. icon requires the
+Material Symbols Outlined font separately. use() includes legacy Helvetica rules.
+
+Shadows: shadow('soft',{shadows:['12.15']}) returns shadow-soft-12-15 and
+shadow-hsoft-12-15 hover (12px blur, .15 alpha). Structured form:
+shadow('card',{shadows:{raised:{blur:'12.5px',opacity:.2,x:0,y:4}}}) generates
+shadow-card-raised. Inject generator output with live/init. use() uses main namespace.
+
+Responsive default bit order is smallest->largest:
+resp-1000 width<420, resp-0100 420<=width<720,
+resp-0010 720<=width<1010, resp-0001 width>=1010, resp-1111 all ranges.
+1 displays flex, 0 hides important. No overlap at boundaries.
+responsive({key:'show-',breakPoints:[400,600,900]}) customizes prefix/thresholds.
+Two-bit short/tall masks apply only below first width threshold; see docs/styles.md.
+
+style.helpers.show(target,duration?) shows now, hides after optional milliseconds.
+style.helpers.hide(target,duration?) hides now, restores after optional milliseconds.
+First matching element/DOM element; null if missing; prior visibility timer cancels.
+
+## Animations
+
+Automatic CSS (no style.use needed):
+op-fade-in/out, op-slide-up/down/left/right, op-zoom-in/out, op-pulse, op-shake,
+op-spin. Use one effect class per element; wrappers can compose transforms.
+Most run once at 300ms/ease-out/both fill. CSS spin loops at 1s/linear.
+Modifiers: op-fast=150ms, op-slow=1s, op-loop=infinite, op-paused.
+CSS variables: --op-duration, --op-delay, --op-easing, --op-repeat.
+Legacy animated fadeIn/bounceIn/zoomIn/etc. classes remain available.
+
+const motion = _dy.animate('#card', 'fadeIn', {duration:400});
+if (motion) { await motion.finished; motion.cancel(); }
+
+Returns native Animation or null for missing element. Not a promise. Accepts a
+selector or DOM element. Effect names: fadeIn,fadeOut,slideUp,slideDown,slideLeft,
+slideRight,zoomIn,zoomOut,pulse,shake,spin (dashed/op-prefixed names also work).
+Third argument: milliseconds number or native timing options. JS defaults to
+one iteration, even spin; set iterations:Infinity for loops, then cancel later.
+Never await an infinite animation's finished promise. Cancellation of a running
+animation rejects finished. cancel() releases retained styles. Reduced-motion
+preference makes CSS near-instant once and JS zero-duration once.
+
+## Requests and helpers
+
+_dy.down(options) / _dy.upload(options) return XHR, use callbacks, not promises.
+Options: url,type,data(upload),file(upload),timeout,begin(xhr),success(text),
+error(cause),end(),progress(percent). Defaults GET/POST; successful 2xx/304.
+Use native fetch if a promise API is preferred. Script loader is also callback
+based; native ES imports are preferred for application modules.
+element(selector,parent?) -> first/null; address(object,'a.b') -> value/undefined.
+
+## Constraints and verification
+
+Templates, expressions and scripts are trusted code, with raw interpolation.
+Escape/sanitize untrusted content for HTML/attribute/URL contexts; never put
+untrusted text into executable code. Legacy eval/inline hooks and global String
+helpers remain; strict CSP needs adaptation. No SSR, JSX, automatic data binding,
+or automatic reactive rendering is provided. Preserve existing APIs/workflow.
+
+Runnable example: examples/store/index.html, main.js, components/catalog.htm.
+Full docs: README.md, docs/templates.md, docs/api.md, docs/styles.md,
+docs/animations.md, docs/migration.md, docs/llm-prompt.md.
+For repo tests: npm ci; npx playwright install chromium; npm run check; npm test.
+Report actual verification; do not fabricate tests or claim nested DOM is ready
+just because render resolved. Deliver complete files and HTTP serve commands.
+
+## User request follows
+
+Build: [describe the app, pages, users, data, visual style, and interactions].
