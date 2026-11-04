@@ -109,4 +109,4 @@ The pointer example sets local CSS variables from pointer coordinates. Its hover
 4. Preserve distinct outer and item field names and explicitly update the DOM or render again.
 5. Escape untrusted values for their actual destination. The search example escapes its query before inserting it into an input attribute; the form writes submitted text with `textContent`.
 
-The table uses a `#dy` expression to create native rows. Avoid putting loader/repeater hooks directly in table parser contexts such as `tbody`: native HTML parsing can move the generated image hooks outside the table. Other list/grid examples demonstrate the normal repeater workflow.
+The table uses a `#dy` expression to create native rows. Avoid putting loader/repeater hooks directly in table parser contexts such as `tbody`: native HTML parsing can move the generated activation/template hooks outside the table. Other list/grid examples demonstrate the normal repeater workflow.

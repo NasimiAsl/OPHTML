@@ -44,7 +44,7 @@ gallery.innerHTML = await _dy.render('gallery', {
   samples: samples.map((sample, index) => ({ sampleId: sample.id, sampleTitle: sample.title, sampleCategory: sample.category,
     sampleDescription: sample.description, ordinal: String(index + 1).padStart(2, '0') }))
 });
-// The gallery shell is itself a repeater. Wait for its image hook before mounting demos.
+// The gallery shell is a repeater. Check its inserted DOM before mounting demos.
 await new Promise(resolve => {
   const ready = () => gallery.querySelectorAll('[data-sample]').length === samples.length;
   if (ready()) return resolve();
@@ -57,12 +57,20 @@ await Promise.all(samples.map(async sample => {
   const preview = card.querySelector('[data-preview]');
   const data = structuredClone(sample.data);
   let version = 0;
+  let componentTid;
   const context = {
     data, root: preview, notify, setTheme,
     async render() {
       const current = ++version;
-      const html = await _dy.render(sample.id, data);
-      if (current === version) preview.innerHTML = html;
+      const rendered = await _dy.render(sample.id, data, true);
+      if (current !== version) {
+        await _dy.dispose(rendered.data.TID);
+        return;
+      }
+      const previousTid = componentTid;
+      componentTid = rendered.data.TID;
+      preview.innerHTML = rendered.html;
+      if (previousTid != null) await _dy.dispose(previousTid);
     }
   };
   contexts.set(sample.id, context);

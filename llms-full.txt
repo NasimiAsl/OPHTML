@@ -57,7 +57,7 @@ _dy.basePath is separate: it controls the legacy $$root template placeholder.
 Templates are cached by resolved URL. params.noCache=true or 'true' refetches.
 Request/template/init errors reject the render promise; use try/catch.
 Await render waits for loading, header, async initialization, HTML callback,
-and synchronous background code. It does NOT await custom-tag image-load hooks
+and synchronous background code. It does NOT await custom-tag connection/image hooks
 or nested requests after insertion. Wait for their DOM to inspect readiness.
 
 ## Basic template syntax
@@ -126,8 +126,55 @@ directly nested repeater tags in a single template.
 
 ## Other custom tags
 
-Use lowercase paired tags; these compile as strings, not Web Components.
+The self-contained runtime has named internal template, rendering, lifecycle,
+DOM, transport, styling, and compatibility layers; no build step was added.
+See docs/architecture.md. The default export remains {html,script,style}.
+
+Cleanup API: _dy.onDispose(tid, callback) returns an unregister function.
+await _dy.dispose(tidOrElement) releases component/child state and owned object
+references without clearing DOM. await _dy.unmount(element) also clears contents,
+even if cleanup rejects. Both return counts of newly disposed components.
+_dy.isDisposed(tid) is true for disposing, disposed, or unknown component IDs.
+Callbacks may be async, run once in reverse registration order, and descendants
+clean up before parents. Failures aggregate after all cleanup/reference release.
+Register timers/listeners/subscriptions explicitly. Framework pending loads are
+aborted and late DOM commits are canceled; arbitrary app promises need app cleanup.
+For manual render strings, retain data.TID from render(name,data,true) and dispose
+the previous TID on replacement. innerHTML changes alone do not dispose state.
+Use renderElement for a managed wrapper; getDyElement(wrapper).ref.TID identifies
+its state. This lookup preserves legacy DOM identity and loader targeting.
+Runtime array indexes are not shifted on disposal; lengths are not live counts.
+App-held state objects retain their fields; disposal releases engine ownership.
+Rendering/native-hook errors add error.ophtml context with phase/tid/page/url
+when available, preserving existing Error types/messages. Native failures emit
+ophtml-error; intentional disposal cancellation produces AbortError without that
+native failure event. Failed rendering releases owned state. Expression globals
+are restored; legacy aliases/string extensions remain in compatibility installers.
+Runnable cleanup example: examples/lifecycle/index.html.
+
+Rendering optimization: repeaters normalize deferred syntax once per list.
+An internal bounded 128-entry cache reuses placeholder-matching patterns by
+parameter names, not values. Component-source caching remains separate. These
+optimizations do not cache rendered rows or add reactive updates or DOM diffing.
+
+Use lowercase paired template tags. Repeater, switcher, com and loader compile
+to HTMLElement-based op-repeater/op-switch/op-com activation signals. They run
+in a microtask after connection, using the same hidden templates/controllers.
+Generated hooks wait for their component's synchronous background code, if any.
+These generated signals are internal, not standalone component APIs.
+_dy.hookMode defaults to 'elements'; 'legacy' restores image-load triggers.
+Inline content/callscript still use image signals. <switch> aliases <switcher>.
 Give consuming loader/repeater/switcher/content tags a dedicated wrapper.
+
+<if test="$$available">Yes<else>No</else></if> compiles to op-if/op-else.
+test is required trusted JS after parameter substitution; quote strings, e.g.
+test="'$$status' === 'active'". Escape attribute values for their destination.
+Use at most one direct-child else inside if. Nested conditions work. Branches
+choose once on connection, with no automatic reactivity. Inactive child hooks
+are removed before activation. Hash conditions remain render-time directives.
+Hooks expose ready for their own work, not all descendants. Async errors reject
+ready and emit a bubbling ophtml-error event with the Error in event.detail.
+Listen on the mounted container. The example is at examples/native-hooks/.
 
 <div><loader page="card" params="{name:'Ada'}"></loader></div>
 <iloader page="card" params="{name:'Ada'}"></iloader>

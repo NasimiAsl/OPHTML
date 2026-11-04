@@ -39,6 +39,10 @@ Implementation rules:
    user text directly into executable handlers or expressions.
 8. Serve over HTTP. render() does not await inserted custom-tag hooks or
    nested network requests; browser verification must wait for actual DOM.
+   Register component resource cleanup with _dy.onDispose(tid, callback).
+   Use await _dy.unmount(element), or retain render(name,data,true).data.TID
+   and await _dy.dispose(previousTid) when replacing manually rendered HTML.
+   innerHTML assignment does not automatically dispose old state.
 9. Output complete file paths and file contents, real setup/run commands,
    a short explanation, and verification results. Do not fabricate test runs.
 

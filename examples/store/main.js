@@ -18,19 +18,31 @@ let inStockOnly = false;
 let basket = 0;
 const app = document.querySelector('#app');
 const status = document.querySelector('#status');
+let componentTid;
+let renderVersion = 0;
 
 async function render() {
+  const version = ++renderVersion;
   app.setAttribute('aria-busy', 'true');
   try {
-    app.innerHTML = await _dy.render('catalog', {
+    const rendered = await _dy.render('catalog', {
       heading: inStockOnly ? 'Available now' : 'The collection',
       products: inStockOnly ? products.filter(product => product.stock > 0) : products
-    });
+    }, true);
+    if (version !== renderVersion) {
+      await _dy.dispose(rendered.data.TID);
+      return;
+    }
+    const previousTid = componentTid;
+    componentTid = rendered.data.TID;
+    app.innerHTML = rendered.html;
+    if (previousTid != null) await _dy.dispose(previousTid);
   } catch (error) {
+    if (version !== renderVersion) return;
     app.textContent = 'Could not load products. Check the component path and HTTP server.';
     status.textContent = error.message;
   } finally {
-    app.setAttribute('aria-busy', 'false');
+    if (version === renderVersion) app.setAttribute('aria-busy', 'false');
   }
 }
 

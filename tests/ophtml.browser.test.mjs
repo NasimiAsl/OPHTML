@@ -16,6 +16,14 @@ const readmeHtml = [...readme.matchAll(/```html\n([\s\S]*?)```/g)].map(match => 
 const templateDocs = await readFile(new URL('../docs/templates.md', import.meta.url), 'utf8');
 const documentedCounter = /```html\n(<script>[\s\S]*?Clicks: 0<\/button>)\n```/.exec(templateDocs)?.[1];
 const fixtures = {
+  '/templates/native-branches.htm': '<if test="$$enabled"><b>yes</b><else><b>no</b></else></if>',
+  '/templates/native-switch.htm': '<section><switch params="{active:true}" oncreate="item = data.active ? 1 : 0;"><b>first</b>$$next-case<b>second</b></switch></section><p>after</p>',
+  '/templates/native-com.htm': '<com "group.card" params="{name:\'Native\'}"></com>',
+  '/templates/native-inactive.htm': '<if test="false"><section><loader page="never-request"></loader></section><else><b>safe</b></else></if>',
+  '/templates/native-background.htm': '<section><repeater params="[{label:\'ready\'}]" oncreate="if (!window.backgroundReady) throw new Error(\'background raced\');"><b>$$label</b></repeater></section>/// background script<script>window.backgroundReady = true;</script>',
+  '/templates/optimized-rows.htm': '<section><repeater params="$$rows"><p>#_if $$active #_then yes #_else no #_end<span>$$label</span><b>#_dy($$repeaterIndex + 1#_)</b></p></repeater></section>',
+  '/templates/async-dispose.htm': '<script>await new Promise(resolve => setTimeout(resolve, 60)); $$_initialized = true;</script>/// main content<b>late content</b>',
+  '/templates/failing-init.htm': '<script>throw new TypeError("initialization failed");</script>/// main content<b>never</b>',
   '/templates/simple.htm': '<h1>$$heading</h1><p>$$headingLong</p>',
   '/templates/group/card.htm': '<p>$$name</p>',
   '/dyhtml/components/default.htm': '<p>default</p>',
@@ -62,7 +70,7 @@ before(async () => {
       res.end(readmeHtml.find(html => html.startsWith('<!doctype html>')));
     } else if (path === '/docs-quickstart/components/welcome.htm') {
       res.end(readmeHtml[0]);
-    } else if (path.startsWith('/examples/store/') || path.startsWith('/examples/gallery/')) {
+    } else if (path.startsWith('/examples/store/') || path.startsWith('/examples/gallery/') || path.startsWith('/examples/native-hooks/') || path.startsWith('/examples/lifecycle/')) {
       try {
         const file = path.endsWith('/') ? path + 'index.html' : path;
         const body = await readFile(new URL('..' + file, import.meta.url));
@@ -72,6 +80,8 @@ before(async () => {
     } else if (path === '/') {
       res.setHeader('Content-Type', 'text/html');
       res.end('<!doctype html><div id="app"></div>');
+    } else if (path === '/templates/slow.htm') {
+      setTimeout(() => { res.end('<b>slow content</b>'); }, 100);
     } else if (path === '/created') {
       res.writeHead(201); res.end('created');
     } else if (path === '/disconnect') {
@@ -115,6 +125,91 @@ test('exports and legacy globals keep the same engine', async () => {
     library.default.html === _dy, library.default.script === _dyScript,
   ]), [true, true, true, true, true]);
 });
+
+test('HTMLElement hooks render repeater, switch alias, and com without image triggers', async () => {
+  assert.deepEqual(await page.evaluate(() => ['op-repeater', 'op-switch', 'op-com', 'op-if', 'op-else'].map(name => customElements.get(name).prototype instanceof HTMLElement)), [true, true, true, true, true]);
+  for (const [component, params, expected] of [
+    ['tasks', { heading: 'Native rows', tasks: [{ label: 'One', done: true }] }, 'One:'],
+    ['native-switch', {}, 'second'], ['native-com', {}, 'Native'],
+  ]) {
+    const html = await page.evaluate(async ({ component, params }) => {
+      const html = await _dy.render(component, params);
+      document.querySelector('#app').innerHTML = html;
+      return html;
+    }, { component, params });
+    assert.doesNotMatch(html, /<img/);
+    await page.waitForFunction(text => document.querySelector('#app').textContent.includes(text), expected);
+  }
+});
+
+test('if/else chooses one branch, handles nesting, and suppresses inactive loaders', async () => {
+  for (const enabled of [true, false]) {
+    await page.evaluate(async enabled => { document.querySelector('#app').innerHTML = await _dy.render('native-branches', { enabled }); }, enabled);
+    await page.waitForFunction(text => document.querySelector('#app').textContent === text, enabled ? 'yes' : 'no');
+  }
+  const begin = requests.length;
+  await page.evaluate(async () => { document.querySelector('#app').innerHTML = await _dy.render('native-inactive'); });
+  await page.waitForFunction(() => document.querySelector('#app').textContent === 'safe');
+  assert.equal(requests.slice(begin).some(url => url.includes('never-request')), false);
+  await page.evaluate(async () => {
+    document.querySelector('#app').innerHTML = await _dy.renderTemplate('<if test="true"><if test="false">wrong<else>nested</else></if><else>wrong</else></if>');
+  });
+  await page.waitForFunction(() => document.querySelector('#app').textContent === 'nested');
+});
+
+test('conditional elements report errors through ready and ophtml-error', async () => {
+  const result = await page.evaluate(async () => {
+    const element = document.createElement('op-if');
+    let message;
+    element.addEventListener('ophtml-error', event => { message = event.detail.message; });
+    document.querySelector('#app').append(element);
+    try { await element.ready; } catch (error) { await Promise.resolve(); return [error.message, message]; }
+  });
+  assert.deepEqual(result, ['ophtml: <if> requires test', 'ophtml: <if> requires test']);
+});
+
+test('connection hooks wait for synchronous background code during controller mounting', async () => {
+  await page.evaluate(async () => {
+    window.hookErrors = [];
+    document.querySelector('#app').addEventListener('ophtml-error', event => window.hookErrors.push(event.detail.message));
+    await _dy.renderElement(document.querySelector('#app'), 'native-background');
+  });
+  await page.waitForFunction(() => document.querySelector('#app b')?.textContent === 'ready');
+  assert.deepEqual(await page.evaluate(() => window.hookErrors), []);
+});
+
+test('reimport from another module URL reuses native definitions', async () => {
+  await page.evaluate(async () => {
+    await import('/ophtml.js?second-copy');
+    _dy.root = '/templates/';
+    document.querySelector('#app').innerHTML = await _dy.render('native-com');
+  });
+  await page.waitForFunction(() => document.querySelector('#app p')?.textContent === 'Native');
+});
+
+test('native hook example runs its actual files', async () => {
+  await page.goto(origin + '/examples/native-hooks/');
+  await page.waitForFunction(() => document.querySelector('#app h2')?.textContent === 'Native component');
+  const text = await page.locator('#app').innerText();
+  assert.match(text, /Unavailable/);
+  assert.match(text, /One/);
+  assert.match(text, /Two/);
+  assert.match(text, /First case/);
+  assert.doesNotMatch(text, /Second case/);
+});
+
+test('legacy image hooks remain available and produce the same repeater DOM', async () => {
+  for (const mode of ['legacy', 'elements']) {
+    const html = await page.evaluate(async mode => {
+      _dy.hookMode = mode;
+      const html = await _dy.render('tasks', { heading: 'Parity', tasks: [{ label: 'Same', done: false }] });
+      document.querySelector('#app').innerHTML = html;
+      return html;
+    }, mode);
+    assert.equal(html.includes('<img'), mode === 'legacy');
+    await page.waitForFunction(() => document.querySelector('#app p')?.textContent.includes('pending'));
+  }
+});
 test('render preserves values, overlapping names, and metadata', async () => {
   const result = await page.evaluate(async () => {
     const value = await _dy.render('/simple', { heading: 'A $& $$headingLong', headingLong: 'B' }, true);
@@ -123,6 +218,242 @@ test('render preserves values, overlapping names, and metadata', async () => {
   assert.equal(result.html, '<h1>A $& $$headingLong</h1><p>B</p>');
   assert.equal(result.registered, true);
   assert.ok(result.tid > 0);
+});
+
+test('all existing facade properties and default export shape remain available', async () => {
+  const names = 'init paste to_raw address imageFileUploader toHash element get select filter selectMuli last_element generateCssColor elements last_item JsIden js asyncjs mixdeep mix_json rgbToHex hexToRgb temp_baseIdentity temp_objectIden temp_object temp_img behindLoopContainer behindLoop TsID TsName rootUps rootMoves rootClick rootWheel substitute evaluateTemplate compileHtmlHashParts initInnerContent init_page callInitialized helpers img down upload request getDyElement coreScript coreThreadIdentity reload append loader renderElement render elementPageLoad initDrop hideAllDragHelper repRef elementPageRepeat elementPageSwitch elementElementDynamic elementPageDynamic dyHtmlExtensionFormat cacheComopunents renderTemplate loadPage urlParam routeParam'.split(' ');
+  assert.deepEqual(await page.evaluate(names => ({
+    missing: names.filter(name => !Object.prototype.hasOwnProperty.call(_dy, name)),
+    exports: Object.keys(library.default).sort(),
+    facade: _dy === library.dy.prototype,
+    strings: ['A.a'.replaceAll('.', '$&'), 'Aa'.replaceAll('a', 'x', true), 'a-b-c'.splitFirst('-', 1)],
+  }), names), { missing: [], exports: ['html', 'script', 'style'], facade: true, strings: ['A$&a', 'xx', ['a', 'b-c']] });
+});
+
+test('expression globals are restored after success, failure, and nested evaluation', async () => {
+  assert.deepEqual(await page.evaluate(() => {
+    const sentinel = { original: true };
+    window._localItem = sentinel;
+    window.nestedRead = () => _dy.evaluateTemplate('$$n', { n: 2 });
+    const value = _dy.evaluateTemplate('nestedRead() + $$n', { n: 3 });
+    const restored = window._localItem === sentinel;
+    delete window._localItem;
+    try { _dy.evaluateTemplate('(', {}); } catch {}
+    return [value, restored, Object.prototype.hasOwnProperty.call(window, '_localItem')];
+  }), [5, true, false]);
+});
+
+test('dispose releases owned state and references without clearing DOM or shifting indexes', async () => {
+  await page.evaluate(async () => {
+    window.beforeObjects = _dy.temp_object.filter(Boolean).length;
+    window.beforeItems = _dy.repRef.filter(Boolean).length;
+    const result = await _dy.render('tasks', { heading: 'Owned', tasks: [{ label: 'One', done: true }, { label: 'Two', done: false }] }, true);
+    window.ownedTid = result.data.TID;
+    document.querySelector('#app').innerHTML = result.html;
+  });
+  await page.waitForFunction(() => document.querySelectorAll('#app p').length === 2);
+  assert.deepEqual(await page.evaluate(async () => {
+    const length = _dy.repRef.length;
+    const count = await _dy.dispose(ownedTid);
+    return [count, _dy.TsID[ownedTid] === undefined, _dy.temp_object.filter(Boolean).length === beforeObjects,
+      _dy.repRef.filter(Boolean).length === beforeItems, _dy.repRef.length === length,
+      document.querySelectorAll('#app p').length, await _dy.dispose(ownedTid)];
+  }), [1, true, true, true, true, 2, 0]);
+});
+
+test('cleanup callbacks run once in reverse registration order and can unregister', async () => {
+  assert.deepEqual(await page.evaluate(async () => {
+    const { data } = await _dy.render('simple', { heading: 'Cleanup' }, true);
+    const calls = [];
+    _dy.onDispose(data.TID, async state => { calls.push(state.ref.heading); await Promise.resolve(); calls.push('async done'); });
+    _dy.onDispose(data.TID, () => calls.push('last registered'));
+    const unregister = _dy.onDispose(data.TID, () => calls.push('removed'));
+    const removed = unregister();
+    await _dy.dispose(data.TID);
+    await _dy.dispose(data.TID);
+    return [calls, removed];
+  }), [['last registered', 'Cleanup', 'async done'], true]);
+});
+
+test('unmount disposes nested components before parents and leaves siblings active', async () => {
+  await page.evaluate(async () => {
+    window.cleanupOrder = [];
+    const wrapper = await _dy.renderElement(document.querySelector('#app'), 'loader');
+    window.parentTid = _dy.getDyElement(wrapper).ref.TID;
+    _dy.onDispose(parentTid, () => cleanupOrder.push('parent'));
+    window.otherTid = (await _dy.render('simple', { heading: 'Other' }, true)).data.TID;
+  });
+  await page.waitForFunction(() => document.querySelector('#app p')?.textContent === 'Ada');
+  assert.deepEqual(await page.evaluate(async () => {
+    const child = _dy.TsID.find(state => state?.ref?.name === 'Ada');
+    const childTid = child.ref.TID;
+    _dy.onDispose(childTid, () => cleanupOrder.push('child'));
+    const count = await _dy.unmount(document.querySelector('#app'));
+    return [count, cleanupOrder, !_dy.TsID[parentTid], !_dy.TsID[childTid], !!_dy.TsID[otherTid], document.querySelector('#app').childNodes.length];
+  }), [2, ['child', 'parent'], true, true, true, 0]);
+});
+
+test('cleanup failures release every resource and unmount clears DOM before rejecting', async () => {
+  assert.deepEqual(await page.evaluate(async () => {
+    const wrapper = await _dy.renderElement(document.querySelector('#app'), 'simple', { heading: 'Cleanup error' });
+    const tid = _dy.getDyElement(wrapper).ref.TID;
+    const calls = [];
+    _dy.onDispose(tid, () => calls.push('remaining cleanup'));
+    _dy.onDispose(tid, () => { throw new Error('cleanup failed'); });
+    try { await _dy.unmount(document.querySelector('#app')); }
+    catch (error) { return [error.name, error.ophtml.phase, error.errors[0].message, calls, !_dy.TsID[tid], document.querySelector('#app').childNodes.length]; }
+  }), ['AggregateError', 'dispose', 'cleanup failed', ['remaining cleanup'], true, 0]);
+});
+
+test('unmount aborts pending requests and prevents late DOM insertion', async () => {
+  assert.deepEqual(await page.evaluate(async () => {
+    const host = document.querySelector('#app');
+    const loading = _dy.loadPage('slow', host).catch(error => ({ name: error.name, phase: error.ophtml.phase }));
+    const tid = _dy.temp_baseIdentity;
+    await _dy.unmount(host);
+    const error = await loading;
+    await new Promise(resolve => setTimeout(resolve, 130));
+    return [error.name, error.phase, !_dy.TsID[tid], host.childNodes.length];
+  }), ['AbortError', 'dispose', true, 0]);
+});
+
+test('disposal during asynchronous initialization cancels mounting and releases state', async () => {
+  assert.deepEqual(await page.evaluate(async () => {
+    const host = document.querySelector('#app');
+    const loading = _dy.loadPage('async-dispose', host).catch(error => error);
+    const tid = _dy.temp_baseIdentity;
+    while (!_dy.TsID[tid]?.initializing) await new Promise(resolve => setTimeout(resolve, 1));
+    await _dy.dispose(tid);
+    const error = await loading;
+    return [error.name, error.ophtml.phase, !_dy.TsID[tid], host.childNodes.length];
+  }), ['AbortError', 'dispose', true, 0]);
+});
+
+test('unmount cancels a pending detached renderElement mount', async () => {
+  assert.deepEqual(await page.evaluate(async () => {
+    const host = document.querySelector('#app');
+    host.textContent = 'previous content';
+    const loading = _dy.renderElement(host, 'slow').catch(error => error);
+    const tid = _dy.temp_baseIdentity;
+    const previous = host.textContent;
+    await _dy.unmount(host);
+    const error = await loading;
+    await new Promise(resolve => setTimeout(resolve, 130));
+    return [previous, error.name, error.ophtml.phase, _dy.isDisposed(tid), host.childNodes.length];
+  }), ['previous content', 'AbortError', 'dispose', true, 0]);
+});
+
+test('lifecycle status stays private and does not overwrite component fields', async () => {
+  assert.deepEqual(await page.evaluate(async () => {
+    const { data } = await _dy.render('simple', {}, true);
+    const state = _dy.TsID[data.TID];
+    Object.defineProperty(state, 'disposed', { value: 'application field', enumerable: true });
+    let during;
+    _dy.onDispose(data.TID, state => { during = [_dy.isDisposed(data.TID), state.disposed]; });
+    const before = _dy.isDisposed(data.TID);
+    await _dy.dispose(data.TID);
+    return [before, during, _dy.isDisposed(data.TID), state.disposed];
+  }), [false, [true, 'application field'], true, 'application field']);
+});
+
+test('concurrent disposal waits for cleanup and executes each callback once', async () => {
+  assert.deepEqual(await page.evaluate(async () => {
+    const { data } = await _dy.render('simple', {}, true);
+    let calls = 0;
+    _dy.onDispose(data.TID, async () => { await Promise.resolve(); calls++; });
+    const results = await Promise.all([_dy.dispose(data.TID), _dy.dispose(data.TID)]);
+    return [calls, results, _dy.isDisposed(data.TID)];
+  }), [1, [1, 0], true]);
+});
+
+test('repeated mounts and unmounts release component state and reference ownership', async () => {
+  assert.deepEqual(await page.evaluate(async () => {
+    const host = document.querySelector('#app');
+    for (let i = 0; i < 20; i++) {
+      await _dy.renderElement(host, 'simple', { heading: 'Cycle', model: { index: i } });
+      await _dy.unmount(host);
+    }
+    return [_dy.TsID.filter(Boolean).length, _dy.temp_object.filter(Boolean).length, _dy.repRef.filter(Boolean).length];
+  }), [0, 0, 0]);
+});
+
+test('lifecycle example releases its actual timer and listener and can remount', async () => {
+  await page.goto(origin + '/examples/lifecycle/');
+  await page.waitForFunction(() => document.querySelector('#status').textContent === 'Mounted');
+  const tid = await page.evaluate(() => _dy.getDyElement(document.querySelector('#app').firstElementChild).ref.TID);
+  await page.locator('[data-increment]').click();
+  assert.equal(await page.locator('[data-clicks]').textContent(), '1');
+  await page.evaluate(() => {
+    window.oldController = document.querySelector('#app').firstElementChild;
+    window.oldButton = oldController.querySelector('[data-increment]');
+  });
+  await page.locator('#unmount').click();
+  await page.waitForFunction(() => document.querySelector('#app').childNodes.length === 0);
+  assert.deepEqual(await page.evaluate(tid => {
+    oldButton.click();
+    return [_dy.isDisposed(tid), oldController.querySelector('[data-clicks]').textContent];
+  }, tid), [true, '1']);
+  const oldSeconds = await page.evaluate(() => oldController.querySelector('[data-seconds]').textContent);
+  // Keep the old DOM reachable: cleanup must stop the timer, not rely on GC.
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.waitForTimeout(1100);
+  assert.deepEqual(errors, []);
+  assert.equal(await page.evaluate(() => oldController.querySelector('[data-seconds]').textContent), oldSeconds);
+  await page.locator('#mount').click();
+  await page.waitForFunction(() => document.querySelector('[data-clicks]')?.textContent === '0');
+});
+
+test('failed loading and initialization preserve error types and add component context', async () => {
+  const result = await page.evaluate(async () => {
+    const values = [];
+    for (const name of ['missing', 'failing-init']) {
+      try { await _dy.render(name); }
+      catch (error) { values.push([error.name, error.ophtml.phase, error.ophtml.page, !_dy.TsID[error.ophtml.tid]]); }
+    }
+    return values;
+  });
+  assert.deepEqual(result, [['Error', 'load', 'missing', true], ['TypeError', 'initialize', 'failing-init', true]]);
+});
+
+test('managed wrapper lookup preserves legacy loader targeting after repeater activation', async () => {
+  await page.evaluate(async () => {
+    window.wrapper = await _dy.renderElement(document.querySelector('#app'), 'tasks', {
+      heading: 'Old heading', tasks: [{ label: 'Old row', done: false }],
+    });
+  });
+  await page.waitForFunction(() => document.querySelector('#app p')?.textContent.includes('Old row'));
+  assert.deepEqual(await page.evaluate(async () => {
+    const heading = _dy.getDyElement(wrapper).ref.heading;
+    const preservedIdentity = wrapper.iden === undefined;
+    await _dy.loader(wrapper, [{ label: 'New row' }], '<b>$$label</b>');
+    return [heading, preservedIdentity, wrapper.innerHTML];
+  }), ['Old heading', true, '<b>New row</b>']);
+});
+
+test('cached placeholder patterns retain fresh values, literal keys, and eviction behavior', async () => {
+  assert.deepEqual(await page.evaluate(() => {
+    const template = '$$name|$$nameLong|$$a.b|$$missing|$$$item';
+    const first = _dy.substitute(template, { name: '$& $$nameLong', nameLong: 'long', 'a.b': 'dot' });
+    const second = _dy.substitute(template, { name: 'new', nameLong: 'changed', 'a.b': 'fresh' });
+    for (let i = 0; i < 150; i++) _dy.substitute('$$field' + i, { ['field' + i]: i });
+    const afterEviction = _dy.substitute(template, { name: 'again', nameLong: 'last', 'a.b': 'value' });
+    const objectA = {}, objectB = {};
+    const refA = _dy.substitute('$$model', { model: objectA }, true);
+    const refB = _dy.substitute('$$model', { model: objectB }, true);
+    return [first, second, afterEviction, _dy.js(refA) === objectA, _dy.js(refB) === objectB, refA !== refB];
+  }), ['$& $$nameLong|long|dot|$$missing|$$$item', 'new|changed|fresh|$$missing|$$$item', 'again|last|value|$$missing|$$$item', true, true, true]);
+});
+
+test('prepared row templates preserve heterogeneous data and deferred expression ordering', async () => {
+  await page.evaluate(async () => {
+    document.querySelector('#app').innerHTML = await _dy.render('optimized-rows', { rows: [
+      { label: '$$active #_if literal $&', active: true, extra: { value: 1 } },
+      { active: false, label: 'second' },
+    ] });
+  });
+  await page.waitForFunction(() => document.querySelectorAll('#app p').length === 2);
+  assert.deepEqual(await page.locator('#app p').allTextContents(), [' yes $$active #_if literal $&1', ' no second2']);
 });
 test('root accepts a missing trailing slash and dotted component names', async () => {
   assert.equal(await page.evaluate(async () => {
@@ -186,7 +517,7 @@ test('quoted and unquoted string expressions do not turn data into code', async 
 test('header output is available to conditions', async () => {
   assert.match(await page.evaluate(() => _dy.render('header')), /<h1>From header<\/h1>/);
 });
-test('real browser image hooks render repeaters and preserve item references', async () => {
+test('real browser hooks render repeaters and preserve item references', async () => {
   await page.evaluate(async () => {
     window.tasks = [{ label: 'Read', done: true }, { label: 'Build', done: false }, null];
     document.querySelector('#app').innerHTML = await _dy.render('tasks', { heading: 'Tasks', tasks });
@@ -579,6 +910,8 @@ test('store example loads real files, filters products, updates basket and repla
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin + '/examples/store/');
   await page.waitForFunction(() => document.querySelectorAll('#app article').length === 3);
+  assert.equal(await page.evaluate(() => _dy.TsID.filter(Boolean).length), 1);
+  assert.equal(await page.evaluate(() => _dy.repRef.filter(Boolean).length), 3);
   assert.equal(await page.locator('#app article').count(), 3);
   assert.match(await page.locator('#app').innerText(), /\$18\.00/);
   assert.equal(await page.locator('#app button:disabled').count(), 1);
@@ -591,6 +924,8 @@ test('store example loads real files, filters products, updates basket and repla
   assert.equal(await page.locator('#status').innerText(), 'Animation replayed.');
   await page.locator('#filter').click();
   await page.waitForFunction(() => document.querySelectorAll('#app article').length === 3);
+  assert.equal(await page.evaluate(() => _dy.TsID.filter(Boolean).length), 1);
+  assert.equal(await page.evaluate(() => _dy.repRef.filter(Boolean).length), 3);
   await page.setViewportSize({ width: 375, height: 800 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);

@@ -14,6 +14,22 @@ The two original modules are reference files. Do not load old `dystyle.js` after
 
 ## Corrected behavior to check
 
+The runtime's named internal layers still ship in one module with the same public
+facade and constructor aliases. Legacy globals and string helpers remain available
+through compatibility installers. Add explicit `onDispose` / `dispose` / `unmount`
+calls to release component resources; existing manual DOM replacement stays manual.
+`getDyElement()` recognizes exact managed wrappers without changing their legacy DOM identity. Pending detached mounts
+can be canceled by unmounting their target. Failed rendering releases owned state;
+errors retain types/messages and add `ophtml` context. See architecture.md and api.md.
+
+Repeater/switcher/component-loader triggers now compile to `HTMLElement` subclasses
+(`op-repeater`, `op-switch`, `op-com`), retaining existing wrapper/controller
+behavior. Set `_dy.hookMode = 'legacy'` before rendering for image triggers.
+`<switch>` aliases `<switcher>`. New `<if test="EXPR">...<else>...</else></if>`
+branches run on connection; existing hash conditions remain render-time directives.
+Activation timing changes from image load to a microtask after connection; mounted
+descendants are still not awaited by `render()`. See templates.md for error events.
+
 OPHTML 1.1.1 adds the example gallery and fixes switcher closing-tag conversion, so content following a switcher remains outside its case template.
 
 - Conditions handle false branches/nesting; `#if` aliases expression conditions. Invalid directives now throw instead of silently producing damaged HTML.

@@ -13,6 +13,20 @@ document.querySelector('#app').innerHTML = await _dy.render('welcome', {
 
 No runtime dependencies or build step. OPHTML 1.1.1 preserves the dyHTML workflow and includes the corrected dyStyle generators.
 
+Repeater, switcher, and component-loader triggers now use classes extending
+`HTMLElement`, registered as `op-repeater`, `op-switch`, and `op-com`. Keep writing
+the existing short template tags; `<switch>` also aliases `<switcher>`.
+`<if test="$$available">Yes<else>No</else></if>` adds connection-time branches.
+See the [native hook example](examples/native-hooks/index.html) and
+[template guide](docs/templates.md). Set `_dy.hookMode = 'legacy'` to use the
+original image-load triggers.
+
+The runtime is organized into internal rendering, templates, lifecycle, DOM,
+transport, styling, and compatibility layers in the same self-contained file.
+Use `_dy.onDispose(tid, cleanup)`, `await _dy.dispose(tidOrElement)`, and
+`await _dy.unmount(element)` to release component resources. See the
+[architecture guide](docs/architecture.md) and [runnable cleanup example](examples/lifecycle/index.html).
+
 ## Try the example
 
 ```sh
@@ -153,6 +167,9 @@ if (motion) { await motion.finished; motion.cancel(); }
 - The legacy workflow uses `eval`, inline image-load hooks, and global string helpers. A strict CSP blocking these needs additional adaptation.
 - Rendering returns HTML after the component's initialization and synchronous background script. Custom tags activate after insertion; nested components may finish later.
 - There are no automatic reactive updates. Explicitly rerender or update the DOM in a handler.
+- Repeaters prepare deferred syntax once per list and reuse a bounded cache of
+  placeholder-matching patterns. These optimizations preserve explicit rendering;
+  they do not cache rendered rows. See the [optimization measurements](benchmarks/OPTIMIZATION-RESULTS.md).
 
 ## Development
 

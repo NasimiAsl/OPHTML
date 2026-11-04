@@ -68,15 +68,60 @@ Prefer `render`/`renderElement` for new code.
 | Property | Meaning |
 | --- | --- |
 | `_dy.root` | Component directory; default `/dyhtml/components/` |
+| `_dy.hookMode` | `'elements'` (default): HTMLElement triggers for repeaters/switchers/loaders; `'legacy'`: original image-load triggers |
 | `_dy.dyHtmlExtensionFormat` | Default `.htm` |
 | `_dy.basePath` | Legacy `$$root` replacement, separate from component root |
 | `_dy.TsID[tid]` | State; `.ref` holds parameters and `.ctrl` the controller, if supplied |
 | `_dy.cacheComopunents` | Legacy-spelled template cache |
 | `_dy.temp_object`, `_dy.repRef` | Internal object references; do not rewrite manually |
 
-`getDyElement(selectorOrElement)` reads state for an element with an `iden` property, or returns null. It does not walk ancestors or infer state for arbitrary children. The global reference collections currently have no public disposal API.
+`getDyElement(selectorOrElement)` reads state through a legacy `iden` property or an exact managed-controller ownership match, or returns null. It does not walk ancestors or infer state for arbitrary children. Managed wrapper lookup does not add DOM identity fields that change legacy loader routing.
+
+## Component cleanup
+
+```javascript
+const wrapper = await _dy.renderElement(document.querySelector('#app'), 'products', { products });
+const unregister = _dy.onDispose(_dy.getDyElement(wrapper).ref.TID, () => {
+  // Clear application timers, listeners, subscriptions, or other owned resources.
+});
+await _dy.unmount(document.querySelector('#app'));
+```
+
+| Method | Behavior |
+| --- | --- |
+| `onDispose(tid, cleanup)` | Register a sync/async cleanup callback; return an unregister function. Unknown IDs throw RangeError. |
+| `await dispose(tidOrElement)` | Release matching managed components and nested loads; leave their DOM in place. Return the number of components newly disposed. |
+| `await unmount(element)` | Dispose components owned by the element/subtree and pending mounts, then clear its contents even if cleanup rejects. Return the newly disposed count. |
+| `isDisposed(tid)` | True for disposing, disposed, or unknown IDs. Lifecycle status does not occupy application state fields. |
+
+Descendants clean up before their parent; each component's callbacks run in reverse
+registration order and may return promises. All callbacks and reference releases
+run even when callbacks throw; failures are collected in an AggregateError. An
+unregister function prevents its callback from running. Register application-owned
+timers/listeners explicitly; arbitrary browser resources are not inferred.
+
+Framework component requests are aborted on disposal, and pending framework DOM
+commits are canceled with AbortError. Repeated disposal after completion returns
+zero. Concurrent disposal waits for current cleanup without invoking it twice.
+Owned `TsID`, `temp_object`, and `repRef` entries are deleted without shifting
+other live indexes; array lengths are not live counts. Source/pattern caches remain.
+Application-held state objects retain their fields, including nonconfigurable
+application properties; disposal releases the engine's ownership of them.
+
+For manually inserted `render()` strings, retain the TID with `render(name, data,
+true)` and pass it to `dispose()`. DOM ownership cannot always be inferred from a
+plain string. Replacing `innerHTML` does not automatically dispose old components.
+
+Rendering/native-hook errors preserve their types and messages and add
+`error.ophtml` phase/component/path details when available. Failed rendering
+releases its owned state. Native-hook failures emit `ophtml-error`; intentional
+disposal cancellation does not. See [runtime structure](architecture.md).
 
 ## DOM helpers
+
+Rendering reuses up to 128 internal placeholder-matching patterns by parameter-name
+shape. This cache is separate from the component-source cache and retains neither
+rendered row HTML nor substituted values. There is no new cache configuration API.
 
 | Method | Result |
 | --- | --- |
@@ -85,7 +130,7 @@ Prefer `render`/`renderElement` for new code.
 | `last_element(selector, callback?, parent?)` | Last matching element, or invoke callback |
 | `address(object, 'a.b.c')` | Dotted path, undefined if missing |
 | `get(id)` | Internal temporary object by index |
-| `last_item(array)` | Last entry, or undefined for an empty array |
+| `last_item(array)` | Last entry, or null for an empty array (legacy behavior) |
 
 Consult the source for advanced extraction and drag/drop helpers. Prefer native DOM APIs when clearer; no generic binding system is implied.
 

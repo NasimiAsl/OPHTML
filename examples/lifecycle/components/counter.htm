@@ -1,0 +1,24 @@
+<script>
+  const state = $$$item;
+  const controller = state.ctrl;
+  state.clicks = 0;
+  state.seconds = 0;
+  const handleClick = event => {
+    if (!event.target.closest('[data-increment]')) return;
+    state.clicks += 1;
+    controller.querySelector('[data-clicks]').textContent = String(state.clicks);
+  };
+  controller.addEventListener('click', handleClick);
+  _dy.onDispose($$TID, () => controller.removeEventListener('click', handleClick));
+  const timer = setInterval(() => {
+    state.seconds += 1;
+    controller.querySelector('[data-seconds]').textContent = String(state.seconds);
+  }, 1000);
+  _dy.onDispose($$TID, () => clearInterval(timer));
+</script>
+/// main content
+<section>
+  <h2>$$title</h2>
+  <button type="button" data-increment>Clicks: <span data-clicks>0</span></button>
+  <p>Mounted for <span data-seconds>0</span> seconds.</p>
+</section>

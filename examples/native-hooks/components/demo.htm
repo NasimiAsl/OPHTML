@@ -1,0 +1,12 @@
+<h1>HTMLElement activation</h1>
+<if test="$$available">
+  <p>Available</p>
+  <else><p>Unavailable</p></else>
+</if>
+<section>
+  <repeater params="$$rows"><p>$$label</p></repeater>
+</section>
+<section>
+  <switch><p>First case</p>$$next-case<p>Second case</p></switch>
+</section>
+<com "card" params="{name:'Native component'}"></com>

@@ -122,7 +122,42 @@ Avoid reusing outer parameter names as item fields: outer substitution happens f
 | `dyc` | Inline element-content variant | `<dyc "{name:'Ada'}">$$name</dyc>` |
 | `callscript` | Inline execution hook | `<callscript>console.log('ready')</callscript>` |
 
-These tags are compiled as strings, not Web Components. Use lowercase paired tags and the shown attribute forms. Give consuming tags their own wrapper.
+These short names are template syntax. Repeater, switcher, and component-loader
+hooks compile to registered `op-repeater`, `op-switch`, and `op-com` elements.
+Their classes extend `HTMLElement` and activate the existing controllers from
+`connectedCallback()` after one microtask, rather than waiting for an image load.
+When a component has synchronous background code, its generated hooks wait for
+that code before activation, preserving controller-mount initialization order.
+The generated hook sits before a hidden template; it is not a standalone component
+API. Use lowercase paired template tags and the shown attributes, and give consuming
+tags their own wrapper. `<switch>` is an alias of `<switcher>`.
+
+Set `_dy.hookMode = 'legacy'` before rendering to retain the original image-load
+signals; the default is `'elements'`. The template cache stores source, so switching
+modes does not require clearing the cache. Inline content and callscript hooks still
+use their legacy image signals. Eval and raw interpolation also remain unchanged.
+
+### Element condition branches
+
+```html
+<if test="$$available">
+  <p>Available</p>
+  <else><p>Unavailable</p></else>
+</if>
+```
+
+`<if>` and its optional direct-child `<else>` compile to `op-if` / `op-else`.
+`test` is a required trusted JavaScript expression after normal parameter
+substitution. For string comparisons quote the substituted value, for example
+`test="'$$status' === 'active'"`. Escape attribute values appropriately; this is
+not safe for arbitrary untrusted input. Conditions choose a branch once on
+connection; they do not create reactive bindings. Nested condition tags work.
+Unselected child hooks are disconnected before activation. Invalid condition
+structure rejects the element's `ready` promise and emits a bubbling
+`ophtml-error` event whose `detail` is the Error. Listen on the mounted container
+for asynchronous hook errors. A generated element's `ready` covers its own hook,
+not every descendant. Existing `#if` / `#is` directives are unchanged and still
+evaluate while rendering, before DOM insertion.
 
 Loader attributes include `page`, `path`, `params`, `def`, `css`, `onready`, and `online`. `def="false"` removes the parent. `params` is an evaluated JavaScript expression, not necessarily JSON. `path` follows root precedence above.
 
@@ -163,6 +198,29 @@ Other section markers:
 
 ## What await guarantees
 
-`await _dy.render(...)` waits for loading, header execution, async initialization, the HTML callback, and synchronous background code. It returns a string, not a mounted tree. After insertion, image-load hooks activate custom tags; nested loaders can make further asynchronous requests. Wait for their DOM content before inspecting them.
+`await _dy.render(...)` waits for loading, header execution, async initialization, the HTML callback, and synchronous background code. It returns a string, not a mounted tree. After insertion, custom-element connection hooks (or legacy image-load hooks) activate custom tags; nested loaders can make further asynchronous requests. Wait for their DOM content before inspecting them.
 
 Templates are cached by URL. Pass `noCache: true` or `noCache: 'true'` to fetch again. Data interpolation and initialization still run on every render.
+
+Repeater deferred syntax is normalized once per list, rather than once per item.
+Placeholder matching patterns are reused by parameter-name shape in a bounded
+128-entry cache. Fresh values and object references are substituted each time;
+there is no rendered-row cache or automatic DOM diffing. Templates without hash
+characters skip the hash-directive parser.
+
+## Releasing component resources
+
+Register cleanup in the main initialization script with
+`_dy.onDispose($$TID, cleanup)`. It runs once when the application calls
+`dispose(tidOrElement)` or `unmount(element)`. Use it to remove component-owned
+listeners and cancel timers or subscriptions. Callbacks may be asynchronous and
+run before their state is released. The [lifecycle example](../examples/lifecycle/index.html)
+demonstrates a delegated click listener and an interval, including remounting.
+
+Use `renderElement()` for an explicitly managed mount, or retain the TID from
+`render(name, data, true)` when assigning HTML manually. Dispose the previous TID
+when replacing manually rendered content; replacement does not infer every old
+component's ownership. The store and gallery examples demonstrate this pattern.
+Pending framework loads are canceled on disposal, and asynchronous controllers
+check ownership before committing. This does not cancel arbitrary application
+promises unless the application registers their cancellation in a cleanup callback.

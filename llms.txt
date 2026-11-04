@@ -13,6 +13,7 @@ Do not infer APIs from the project name. There is no reactive binding system.
 - [LLM prompt](docs/llm-prompt.md): copyable app-generation prompt and constraints.
 - [Templates](docs/templates.md): directives, repeaters, script sections, lifecycle.
 - [API](docs/api.md): rendering, state, callbacks, return types.
+- [Architecture](docs/architecture.md): internal layers, compatibility, ownership, and component cleanup.
 - [Styles](docs/styles.md): tokens, class names, responsive masks.
 - [Animations](docs/animations.md): automatic CSS effects and native Animation controls.
 - [36-example gallery](docs/gallery.md): runnable UI patterns, component-based nested lists, themes, and mouse interactions; entry at examples/gallery/index.html.
@@ -29,6 +30,10 @@ Do not infer APIs from the project name. There is no reactive binding system.
 - `op-fade-in`, `op-slide-up`, `op-spin` CSS works after import.
 - `_dy.animate(selector, 'fadeIn', options)` returns Animation/null; await `.finished`.
 - No automatic UI updates. Render again or modify DOM explicitly.
-- render awaits its own initialization, not image-load hooks or nested requests after insertion.
+- Register resource cleanup with _dy.onDispose(tid, callback). Await _dy.dispose(tidOrElement) to release state, or _dy.unmount(element) to also clear DOM. _dy.isDisposed(tid) includes pending disposal/unknown IDs.
+- Manual render strings need their TID retained via render(name, data, true) for reliable cleanup. innerHTML replacement alone does not dispose components.
+- Repeater/switcher/com/loader hooks compile to HTMLElement-based op-* signals; hookMode='legacy' retains image triggers. <switch> aliases <switcher>.
+- <if test="$$available">Yes<else>No</else></if> chooses once on connection; #if remains unchanged. See docs/templates.md for structure and async errors.
+- render awaits its own initialization, not connection/image hooks or nested requests after insertion.
 - Templates execute trusted JS and interpolate raw HTML. Escape/sanitize untrusted data.
 - Serve over HTTP; preserve the legacy eval/inline-hook environment when setting CSP.

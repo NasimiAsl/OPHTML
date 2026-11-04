@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPHTML component cleanup</title>
+<h1>Mount and clean up a component</h1>
+<p>The counter owns a click listener and a timer. Unmounting releases both.</p>
+<button id="mount" type="button">Mount counter</button>
+<button id="unmount" type="button">Unmount counter</button>
+<p id="status" role="status"></p>
+<main id="app"></main>
+<script type="module">
+  import OPHTML from '../../dyHTML/ophtml.js';
+  const engine = OPHTML.html;
+  engine.root = './components/';
+  const app = document.querySelector('#app');
+  const status = document.querySelector('#status');
+  async function mount() {
+    await engine.unmount(app);
+    await engine.renderElement(app, 'counter', { title: 'A component with cleanup' });
+    status.textContent = 'Mounted';
+  }
+  document.querySelector('#mount').addEventListener('click', () => mount().catch(showError));
+  document.querySelector('#unmount').addEventListener('click', async () => {
+    try {
+      await engine.unmount(app);
+      status.textContent = 'Unmounted: listener and timer released';
+    } catch (error) { showError(error); }
+  });
+  app.addEventListener('ophtml-error', event => showError(event.detail));
+  function showError(error) {
+    if (error.name !== 'AbortError') status.textContent = error.message;
+  }
+  await mount();
+</script>
+</html>

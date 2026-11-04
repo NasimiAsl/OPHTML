@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPHTML native hook example</title>
+<main id="app"></main>
+<script type="module">
+  import OPHTML from '../../dyHTML/ophtml.js';
+  OPHTML.html.root = './components/';
+  document.querySelector('#app').addEventListener('ophtml-error', event => {
+    console.error(event.detail);
+  });
+  document.querySelector('#app').innerHTML = await OPHTML.html.render('demo', {
+    available: false, rows: [{ label: 'One' }, { label: 'Two' }]
+  });
+</script>
+</html>
