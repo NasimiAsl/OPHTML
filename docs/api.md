@@ -166,3 +166,20 @@ _dy.upload({ url: '/api/files', file: [{ data: fileInput.files[0] }], data: { fo
 Use `_dy.style`, `OPHTML.style`, or named `style`. `_dyStyle` points to the same object unless another script overwrites it. See [styles](styles.md) and [animations](animations.md).
 
 `_dy.animate(target, effect, options?)` shortcuts `_dy.style.animate`. It returns a native Animation, or null for a missing element. Await `.finished`, not the returned object itself.
+
+## Component roots over the page WebSocket
+
+On an OP-SERVER mapped HTTPS page, its injected `window.OPComponents` helper supplies component source. Set `_dy.root` to `https://api.rudan.studio/op/components/`, `https://cdn.rudan.studio/op/components/`, either origin alone, or a `wss://<mapped-host>/__op/components` selector. These roots reuse the page's component-only socket; they do not open an operator socket or download component files through HTTP. Same-origin HTTPS `/op/components/` roots are also supported. Other roots retain the existing HTTP loader.
+
+```javascript
+_dy.root = 'https://api.rudan.studio/op/components/';
+const html = await _dy.render('profile-card', {name:'Nasimi', role:'OPHTML author'});
+```
+
+The existing source cache is checked first, so cached templates render with fresh data even when the socket is offline. Concurrent initial reads of the same URL share one request. `noCache:true` and `noCache:'true'` request fresh source without replacing the normal cache, matching existing HTTP behavior. Caching is per page/URL, with no automatic live subscription or persistent-browser cache. Nested components use the same loader.
+
+`_dy.componentSocket` optionally supplies a helper implementing `.ready` and `.get(names, {timeout})`; by default the runtime uses `window.OPComponents` and waits for its ready event if it has not been installed yet. `_dy.componentWebSocketTimeout` defaults to 30,000 ms. `_dy.componentWebSocketOrigins` defaults to the API/CDN HTTPS origins above; configure that array for other deployments or use an explicit component WebSocket root. WebSocket roots select the existing helper, not an arbitrary remote connection. A missing helper, rejected component or socket failure rejects rendering without silent HTTP fallback. Disposing one render cancels that render's wait and prevents insertion, without closing the shared page connection or cancelling other consumers.
+
+Only `.htm` templates and valid component names are supported by this service. The component-only role needs no operator key or pairing code. It can read public templates only; it does not prove a human visitor.
+
+[Mapped-page example](../examples/websocket/index.html). The runtime can now initialize and render plain interpolation-only components without `unsafe-eval`. Expression directives and executable template scripts still require a compatible trusted-script CSP; this change does not remove those requirements.
