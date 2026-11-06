@@ -77,6 +77,9 @@ before(async () => {
         res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
         res.end(body);
       } catch { res.writeHead(404); res.end('missing'); }
+    } else if (path === '/csp/') {
+      res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'");
+      res.setHeader('Content-Type','text/html');res.end('<!doctype html><div id="app"></div>');
     } else if (path === '/') {
       res.setHeader('Content-Type', 'text/html');
       res.end('<!doctype html><div id="app"></div>');
@@ -1070,4 +1073,88 @@ test('gallery search, category filters and source inspection are usable on mobil
   assert.equal(await page.locator('[data-sample]:visible').count(), 36);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);
+});
+
+test('API, CDN, and WebSocket roots load through the page service and retain source caching', async () => {
+  const result = await page.evaluate(async () => {
+    const calls = [];
+    window.OPComponents = {ready: Promise.resolve(), async get(names) {
+      calls.push(names[0]);return [{name:names[0],html:'<h2>$$name</h2>'}];
+    }};
+    const output = [];
+    for (const root of ['https://api.rudan.studio/op/components/', 'https://cdn.rudan.studio/', 'wss://www.rudan.studio/__op/components']) {
+      _dy.root = root;
+      output.push(await _dy.render('profile-card', {name:'First'}));
+      output.push(await _dy.render('profile-card', {name:'Second'}));
+    }
+    delete window.OPComponents;
+    output.push(await _dy.render('profile-card', {name:'Offline'}));
+    return {calls,output};
+  });
+  assert.deepEqual(result.calls, ['profile-card','profile-card','profile-card']);
+  assert.deepEqual(result.output, ['<h2>First</h2>','<h2>Second</h2>','<h2>First</h2>','<h2>Second</h2>','<h2>First</h2>','<h2>Second</h2>','<h2>Offline</h2>']);
+  assert.equal(requests.filter(url => url.includes('profile-card')).length, 0);
+});
+
+test('socket loader shares concurrent reads and preserves explicit fresh reads and nested components', async () => {
+  await page.evaluate(async () => {
+    window.socketCalls = [];
+    window.OPComponents = {ready: Promise.resolve(), async get(names) {
+      socketCalls.push(names[0]);await new Promise(resolve => setTimeout(resolve, 15));
+      return [{name:names[0],html:names[0] === 'parent' ? '<com "cards.detail" params="{name:\'Nested\'}"></com>' : '<b>$$name</b>'}];
+    }};
+    _dy.root = 'https://api.rudan.studio/op/components/';
+    const values = await Promise.all([_dy.render('profile-card',{name:'A'}),_dy.render('profile-card',{name:'B'})]);
+    if (values.join('') !== '<b>A</b><b>B</b>') throw Error('Cached source substituted the wrong data');
+    await _dy.render('profile-card',{name:'Fresh',noCache:true});
+    await _dy.render('profile-card',{name:'Fresh string',noCache:'true'});
+    document.querySelector('#app').innerHTML = await _dy.render('parent', {});
+  });
+  await page.waitForFunction(() => document.querySelector('#app').textContent === 'Nested');
+  assert.deepEqual(await page.evaluate(() => socketCalls), ['profile-card','profile-card','profile-card','parent','cards/detail']);
+});
+
+test('socket load errors do not fall back to HTTP and remain retryable', async () => {
+  const result = await page.evaluate(async () => {
+    let count = 0;
+    _dy.root = 'https://api.rudan.studio/op/components/';
+    window.OPComponents = {ready: Promise.resolve(), async get(names) {
+      if (++count === 1) throw Error('Component connection closed');
+      return [{name:names[0],html:'<p>Retry</p>'}];
+    }};
+    let error;try {await _dy.render('retry');}catch (e) {error = [e.message,e.ophtml.phase];}
+    return [error,await _dy.render('retry'),count];
+  });
+  assert.match(result[0][0], /connection closed/);
+  assert.equal(result[0][1], 'load');
+  assert.deepEqual(result.slice(1), ['<p>Retry</p>',2]);
+});
+
+test('socket loading waits for the injected helper and disposal leaves shared consumers alive', async () => {
+  const result = await page.evaluate(async () => {
+    _dy.root = 'https://cdn.rudan.studio/op/components/cards/';
+    const firstHost = document.createElement('div');document.body.append(firstHost);
+    const loading = _dy.loadPage('detail', firstHost).catch(error => error);
+    const other = _dy.render('detail', {name:'Other'});
+    const tid = _dy.TsID.length - 2;
+    await _dy.dispose(tid);
+    window.OPComponents = {ready: Promise.resolve(), async get(names) {return [{name:names[0],html:'<b>$$name</b>'}];}};
+    window.dispatchEvent(new CustomEvent('op-components-ready'));
+    const failed = await loading;
+    return [failed.name, firstHost.innerHTML, await other];
+  });
+  assert.deepEqual(result, ['AbortError','','<b>Other</b>']);
+});
+
+
+test('plain socket components work without unsafe-eval at startup', async () => {
+  await page.goto(origin + '/csp/');
+  const result = await page.evaluate(async () => {
+    const {default: library} = await import('/ophtml.js');
+    library.html.root = 'https://api.rudan.studio/op/components/';
+    window.OPComponents = {ready:Promise.resolve(),async get(names) {return [{name:names[0],html:'<h2>$$name</h2>'}];}};
+    document.querySelector('#app').innerHTML = await library.html.render('profile-card',{name:'CSP works'});
+    return [document.querySelector('#app').textContent,window.pow(3),window.floor(1.5),window.def(null,'fallback')];
+  });
+  assert.deepEqual(result,['CSP works',9,1,'fallback']);
 });

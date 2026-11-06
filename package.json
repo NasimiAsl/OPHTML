@@ -10,7 +10,7 @@
   "repository": { "type": "git", "url": "https://github.com/NasimiAsl/OPHTML.git" },
   "scripts": {
     "test": "node --test --test-timeout=60000 tests/*.test.mjs",
-    "check": "node --check dyHTML/ophtml.js && node --check examples/store/main.js && node --check examples/gallery/main.js && node --check examples/gallery/samples.js"
+    "check": "node --check dyHTML/ophtml.js && node --check examples/store/main.js && node --check examples/gallery/main.js && node --check examples/gallery/samples.js && node --check examples/websocket/main.js"
   },
   "devDependencies": { "playwright": "1.57.0" },
   "engines": { "node": ">=22" }

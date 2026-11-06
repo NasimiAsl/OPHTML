@@ -216,6 +216,9 @@ function createRuntimeState() {
         repRef: [],
         dyHtmlExtensionFormat: ".htm",
         cacheComopunents: [],
+        componentWebSocketOrigins: ['https://api.rudan.studio', 'https://cdn.rudan.studio'],
+        componentWebSocketTimeout: 30000,
+        componentSocket: null,
         helpers: [],
         coreScript: [],
         coreThreadIdentity: 0,
@@ -776,6 +779,91 @@ function componentAddress(engine, page, root) {
         name = name.slice(0, -extension.length);
     return (root.replace(/\/+$/, '') + '/' + name.replace(/\./g, '/') + extension).replace('/public/', '/');
 }
+// Select the page's restricted component service; do not open an operator socket.
+function socketComponentName(engine, page, root) {
+    const configured = engine.root || (root && root !== '/' ? root : '/dyhtml/components/');
+    let address;
+    try { address = new URL(configured, document.baseURI); } catch { return null; }
+    let prefix = '';
+    if (address.protocol === 'wss:') {
+        if (address.pathname.replace(/\/+$/, '') !== '/__op/components' || address.search || address.hash)
+            throw new Error('ophtml: WebSocket component roots must use /__op/components');
+    } else {
+        const known = (engine.componentWebSocketOrigins || []).includes(address.origin);
+        const own = address.origin === location.origin;
+        const path = address.pathname.replace(/\/+$/, '');
+        if (address.protocol !== 'https:' || !known && !own)
+            return null;
+        if (path === '' && known) prefix = '';
+        else if (path === '/op/components' || path.startsWith('/op/components/'))
+            prefix = path.slice('/op/components'.length).replace(/^\/+/, '');
+        else return null;
+        if (address.search || address.hash)
+            throw new Error('ophtml: component WebSocket roots cannot contain query strings or fragments');
+    }
+    if (engine.dyHtmlExtensionFormat !== '.htm')
+        throw new Error('ophtml: the component WebSocket service requires .htm templates');
+    let name = String(page).replace(/^\/+/, '');
+    if (name.endsWith('.htm')) name = name.slice(0, -4);
+    name = (prefix ? prefix + '/' : '') + name.replace(/\./g, '/');
+    if (!/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(name) || name.length > 96)
+        throw new Error('ophtml: invalid WebSocket component name');
+    return name;
+}
+function socketComponentSource(engine, name) {
+    return new Promise((resolve, reject) => {
+        let started = false, finished = false;
+        const timeout = Number(engine.componentWebSocketTimeout) > 0 ? Number(engine.componentWebSocketTimeout) : 30000;
+        const timer = setTimeout(() => finish(new Error('ophtml: component WebSocket request timed out')), timeout);
+        function finish(error, html) {
+            if (finished) return;
+            finished = true;clearTimeout(timer);
+            window.removeEventListener('op-components-ready', available);
+            if (error) reject(error);else resolve(html);
+        }
+        function available() {
+            const client = engine.componentSocket || window.OPComponents;
+            if (started || finished || !client || typeof client.get !== 'function') return;
+            started = true;
+            (async () => {
+                try {
+                    await client.ready;
+                    if (finished) return;
+                    const values = await client.get([name], { timeout });
+                    if (!Array.isArray(values) || values.length !== 1 || values[0]?.name !== name || typeof values[0].html !== 'string')
+                        throw new Error('ophtml: incomplete component WebSocket response for ' + name);
+                    finish(null, values[0].html);
+                } catch (error) { finish(error); }
+            })();
+        }
+        window.addEventListener('op-components-ready', available);
+        available();
+    });
+}
+const pendingSocketComponents = new WeakMap();
+function sharedSocketComponent(engine, url, name, noCache) {
+    if (noCache) return socketComponentSource(engine, name);
+    let pending = pendingSocketComponents.get(engine);
+    if (!pending) pendingSocketComponents.set(engine, pending = new Map());
+    if (pending.has(url)) return pending.get(url);
+    const promise = socketComponentSource(engine, name);
+    pending.set(url, promise);
+    const release = () => {if (pending.get(url) === promise) pending.delete(url);};
+    promise.then(release, release);
+    return promise;
+}
+function awaitSocketComponent(promise, record) {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const request = {abort() {finish(new DOMException('ophtml: component was disposed', 'AbortError'));}};
+        function finish(error, html) {
+            if (settled) return;settled = true;record.requests.delete(request);
+            if (error) reject(error);else resolve(html);
+        }
+        record.requests.add(request);
+        promise.then(html => finish(null, html), error => finish(error));
+    });
+}
 async function loadComponent({ page, controller, output, root, params, after, parentTid }) {
     const engine = window._dy;
     const url = componentAddress(engine, page, root);
@@ -789,24 +877,29 @@ async function loadComponent({ page, controller, output, root, params, after, pa
             template = engine.cacheComopunents[url];
         }
         else {
-            let request;
-            template = await new Promise((resolve, reject) => {
-                request = engine.down({
-                    url: requestUrl,
-                    success: resolve,
-                    error(cause) {
-                        if (record.disposed) {
-                            reject(contextualError(new DOMException('ophtml: component was disposed', 'AbortError'), { phase: 'dispose', tid: record.tid }));
-                        }
-                        else {
-                            reject(new Error('ophtml: failed to load ' + requestUrl + (cause?.status ? ' (HTTP ' + cause.status + ')' : ''), { cause }));
-                        }
-                    },
+            const socketName = socketComponentName(engine, page, root);
+            if (socketName !== null) {
+                template = await awaitSocketComponent(sharedSocketComponent(engine, url, socketName, noCache), record);
+            } else {
+                let request;
+                template = await new Promise((resolve, reject) => {
+                    request = engine.down({
+                        url: requestUrl,
+                        success: resolve,
+                        error(cause) {
+                            if (record.disposed) {
+                                reject(contextualError(new DOMException('ophtml: component was disposed', 'AbortError'), { phase: 'dispose', tid: record.tid }));
+                            }
+                            else {
+                                reject(new Error('ophtml: failed to load ' + requestUrl + (cause?.status ? ' (HTTP ' + cause.status + ')' : ''), { cause }));
+                            }
+                        },
+                    });
+                    if (request)
+                        record.requests.add(request);
                 });
-                if (request)
-                    record.requests.add(request);
-            });
-            record.requests.delete(request);
+                record.requests.delete(request);
+            }
             componentState.assertActive(record);
             if (!noCache)
                 engine.cacheComopunents[url] = template;
@@ -1168,7 +1261,11 @@ const controllerApi = {
 };
 // Global and prototype mutations are deliberately confined to this adapter.
 function installLegacyCompatibility(engine, scripts) {
-    trustedScripts.execute(`function def(n,r){return void 0!=n&&null!=n?n:void 0!=r&&null!=r?r:null} var floor=Math.floor,sin=Math.sin,cos=Math.cos,tan=Math.tan,atan=Math.atan,atan2=Math.atan2,asin=Math.asin,acos=Math.acos,pow=function(n,r){return Math.pow(n,r||2)},ceil=Math.ceil,abs=Math.abs,exp=Math.exp,log=Math.log,max=Math.max,min=Math.min,sqrt=Math.sqrt,random=Math.random,round=Math.round,sqrt=Math.sqrt,sign=Math.sign,PI=Math.PI,E=Math.E,deg=PI/180,rad=180/PI;`);
+    // Install the legacy math globals without evaluating a script at module startup.
+    Object.assign(window, {def, pow: (n, r) => Math.pow(n, r || 2), PI: Math.PI, E: Math.E,
+        deg: Math.PI / 180, rad: 180 / Math.PI});
+    for (const name of ['floor','sin','cos','tan','atan','atan2','asin','acos','ceil','abs','exp','log','max','min','sqrt','random','round','sign'])
+        window[name] = Math[name];
     String.prototype.trim = function () { return this.replace(/^\s+|\s+$/gm, ""); };
     String.prototype.replaceAll = function (n, r, a) { return this.replace(RegExp(n.replace(/([\/\,\!\\\^\$\{\}\[\]\(\)\.\*\+\?\|\<\>\-\&])/g, "\\$&"), a ? "gi" : "g"), "string" == typeof r ? r.replace(/\$/g, "$$$$") : r); };
     window._dy = engine;

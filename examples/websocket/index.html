@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rudan · OPHTML components</title>
+  <style>
+    :root{color-scheme:light;font-family:system-ui,sans-serif;color:#17332c;background:#f2f6f2}*{box-sizing:border-box}body{margin:0;padding:clamp(24px,5vw,72px)}main{max-width:960px;margin:auto}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;color:#527c62}h1{font-size:clamp(32px,5vw,56px);letter-spacing:-.04em;margin:12px 0}p{line-height:1.6;color:#52645b}.layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}form,.preview{background:white;border:1px solid #d5e1d8;border-radius:18px;padding:28px}label{display:block;font-size:14px;font-weight:600;margin:0 0 16px}input,select{display:block;width:100%;margin-top:8px;padding:12px;border:1px solid #bfcec3;border-radius:8px;font:inherit;background:#fff;color:inherit}button{padding:12px 16px;background:#245f46;border:0;color:white;border-radius:8px;font:inherit;cursor:pointer}button.secondary{background:#e8efe9;color:#245f46}.actions{display:flex;gap:10px;flex-wrap:wrap}.preview{display:flex;flex-direction:column;justify-content:center;min-height:250px}.preview article{border-left:4px solid #77a16f;padding-left:24px}.preview h2{font-size:32px;margin:0 0 8px}.preview p{margin:0}.meta{font-size:13px;margin-top:24px}#status[data-error="true"]{color:#a12e27}@media(max-width:640px){.layout{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">RUDAN / OPHTML</div>
+  <h1>One component. Your data.</h1>
+  <p>The profile card is delivered by the component-only WebSocket. Its template is cached in this page and reused when you change the data.</p>
+  <div class="layout">
+    <form id="profile-form">
+      <label>Name<input id="name" value="Nasimi" maxlength="100"></label>
+      <label>Role<input id="role" value="OPHTML author" maxlength="160"></label>
+      <label>Component root<select id="root"><option value="api">API root → WebSocket</option><option value="cdn">CDN root → WebSocket</option><option value="socket">WebSocket root</option></select></label>
+      <div class="actions"><button type="submit">Render again</button><button type="button" id="refresh" class="secondary">Refresh template</button></div>
+    </form>
+    <section class="preview" aria-label="Rendered profile card"><div id="profile-card"></div></section>
+  </div>
+  <p class="meta" id="status" role="status">Connecting to the component service…</p>
+  <p class="meta">Component source requests: <strong id="request-count">0</strong>. Ordinary renders reuse the cached template. Refresh explicitly requests a fresh source.</p>
+</main>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

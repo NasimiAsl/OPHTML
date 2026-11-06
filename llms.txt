@@ -37,3 +37,5 @@ Do not infer APIs from the project name. There is no reactive binding system.
 - render awaits its own initialization, not connection/image hooks or nested requests after insertion.
 - Templates execute trusted JS and interpolate raw HTML. Escape/sanitize untrusted data.
 - Serve over HTTP; preserve the legacy eval/inline-hook environment when setting CSP.
+
+- Component source can use the page component-only WebSocket through API/CDN/component-socket root selectors. Preserve the source cache and explicit noCache behavior; see docs/api.md and examples/websocket/. Do not open operator sockets or embed credentials.
